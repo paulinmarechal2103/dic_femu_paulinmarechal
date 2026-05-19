@@ -1,5 +1,5 @@
 import h5py
-from imagecodecs import NONE
+#from imagecodecs import NONE
 import numpy as np
 
 
@@ -610,7 +610,7 @@ def femu_V5(
     return opt
 
 
-from skopt.sampler import LatinHypercube
+from skopt.sampler import Lhs
 
 def femu(
         h5_file,
@@ -660,8 +660,8 @@ def femu(
 
     # 2. Génération manuelle de la réserve de points LHS
     # On en génère un peu plus (ex: 50) au cas où FEniCSx divergerait sur certains points
-    lhs_sampler = LatinHypercube(criterion="maximin", random_state=42)
-    lhs_points = lhs_sampler.generate(dimensions, n_samples=50)
+    lhs_sampler = Lhs(criterion="maximin")
+    lhs_points = lhs_sampler.generate(dimensions, n_samples=50, random_state=42)
     lhs_index = 0
 
     with h5py.File(h5_file, 'r') as f:
@@ -749,7 +749,7 @@ def femu(
                     # Sécurité : si on arrive au bout des 50 points de la réserve, on en régénère
                     if lhs_index >= len(lhs_points):
                         print("--> Réserve LHS épuisée, génération de points supplémentaires...")
-                        lhs_points = lhs_sampler.generate(dimensions, n_samples=20)
+                        lhs_points = lhs_sampler.generate(dimensions, n_samples=20, random_state=iteration_total)
                         lhs_index = 0
                 else:
                     # En phase d'exploitation : on redemande une suggestion à l'algorithme
