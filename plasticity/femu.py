@@ -111,12 +111,14 @@ def is_hill48_physically_valid(params):
     # 2. Conditions de convexité pratique (ratios raisonnables)
     if (F+G) <= 0 or (G+H) <= 0 or (H+F) <= 0:
         return False
-    if max(F,G,H,L,M,N) / min(F,G,H,L,M,N) > 5.0:  # Évite les anisotropies extrêmes
+        
+    # Évite les anisotropies trop brutales qui font exploser le solveur plastique
+    if max(F,G,H,L,M,N) / min(F,G,H,L,M,N) > 3.0:  
         return False
         
     # 3. Cohérence écrouissage / élasticité
     E, Q, k = params[0], params[3], params[4]
-    if Q * k > 0.15 * E:  # Tangente initiale de Voce trop raide vs module élastique
+    if Q * k > 0.15 * E:  
         return False
         
     return True
@@ -157,7 +159,7 @@ def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0
 
     if not is_hill48_physically_valid(params):
         print("--> [REJET PRÉ-FEM] Paramètres non physiques ou Hill48 non convexe.")
-        raise RuntimeError("Hill48 non convexe ou paramètres non physiques")
+        raise ValueError("Hill48 non convexe ou paramètres non physiques")
 
     modèle_hill48 = Hill48Model(
         elastic=ElasticModel(hill_params["E"], hill_params["nu"], tdim=3),
@@ -284,15 +286,15 @@ def femu_V2(
 bounds_ref = [
     (150_000, 250_000),   # E [MPa] : acier, OK
     (0.25, 0.35),         # nu : métaux typiques
-    (10.0, 500.0),        # sigma_Y [MPa] : large mais valide
-    (0.0, 400),         # Q_var [MPa] : découplé, à contraindre séparément si besoin
-    (5.0, 50),          # k_hardening : CORRECTION CRITIQUE
-    (0.3, 1.2),           # F : Hill, élargi légèrement
-    (0.3, 1.2),           # G : Hill
-    (0.4, 1.0),           # H : Hill, restreint pour éviter R45 extrême
-    (1.0, 2.5),           # L : cisaillement hors-plan
-    (0.8, 2.0),           # M : cisaillement hors-plan
-    (0.6, 1.8),           # N : cisaillement plan, cohérent avec H
+    (10.0, 500.0),        # sigma_Y [MPa]
+    (0.0, 400.0),         # Q_var [MPa]
+    (5.0, 50.0),          # k_hardening
+    (0.3, 1.3),           # F : Hill, resserré (évite les rapports d'anisotropie > 3)
+    (0.3, 1.3),           # G : Hill, resserré
+    (0.2, 1.0),           # H : Hill, resserré
+    (0.8, 1.8),           # L : cisaillement hors-plan, resserré
+    (0.8, 1.8),           # M : cisaillement hors-plan, resserré
+    (0.6, 1.6),           # N : cisaillement plan, cohérent avec H et resserré
 ]
 
 def femu_V3(
@@ -637,12 +639,13 @@ from skopt.sampler import Lhs
 
 
 
+
 def femu(
         h5_file,
         params0=[200_500.0, 0.29, 105.0, 52.0, 8.0, 0.52, 0.52, 0.48, 1.52, 1.48, 1.45],
         bounds=bounds_ref,
-        n_lhs_target = 25,                
-        n_successful_calls_target = 60,
+        n_lhs_target = 35,                
+        n_successful_calls_target = 70,
     ):
     """
     Par défaut, si l'échantillonnage par Hypercube Latin (LHS) génère 25 points et que 5 d'entre eux font planter FEniCSx, 
@@ -654,7 +657,6 @@ def femu(
     L'astuce consiste à générer l'intégralité de vos points LHS à l'avance, puis à piocher dedans et à en recréer de nouveaux
     si certains échouent.
     """
-
     dimensions = [
         Real(bounds[i][0], bounds[i][1], name=f"p_{i}") 
         for i in range(len(bounds))
@@ -670,73 +672,67 @@ def femu(
     history_err = []
     history_params = []
 
-    # 1. Configuration de l'Optimizer (on désactive son n_random_starts interne car on gère à la main)
     opt = Optimizer(
         dimensions=dimensions,
-        n_random_starts=0,  # Gestion manuelle
+        n_random_starts=0,  
         acq_func="EI",
         random_state=42
     )
-
     
     successful_calls = 0
     iteration_total = 0
 
-    # 2. Génération manuelle de la réserve de points LHS
-    # On en génère un peu plus (ex: 50) au cas où FEniCSx divergerait sur certains points
+    # Génération manuelle initiale
     lhs_sampler = Lhs(criterion="maximin")
-    lhs_points = lhs_sampler.generate(dimensions, n_samples=50, random_state=42)
-    lhs_index = 0
+    lhs_pool = lhs_sampler.generate(dimensions, n_samples=50, random_state=42)
+
+    # Fonction interne sécurisée pour récupérer le prochain point LHS
+    def get_next_lhs_point():
+        nonlocal lhs_pool
+        if len(lhs_pool) == 0:
+            print("--> [INFO] Réserve LHS vide ! Génération de 50 nouveaux points...")
+            # On change le random_state à chaque génération pour ne pas reproduire les mêmes points
+            lhs_pool = lhs_sampler.generate(dimensions, n_samples=50, random_state=iteration_total + 42)
+        return lhs_pool.pop(0) # Extrait et renvoie le premier élément de la liste
 
     with h5py.File(h5_file, 'r') as f:
         
-        # Détermination du tout premier point à tester
+        # Choix du premier point
         if params0 is not None:
             next_x = params0
             params0 = None
-            using_lhs = False
         else:
-            next_x = lhs_points[lhs_index]
-            lhs_index += 1
-            using_lhs = True
+            next_x = get_next_lhs_point()
 
-        # Boucle principale basée uniquement sur les VRAIS succès
         while successful_calls < n_successful_calls_target:
             iteration_total += 1
             
-            # Message d'affichage pour suivre les deux phases distinctes
             if successful_calls < n_lhs_target:
                 phase_str = f"Phase APPRENTISSAGE LHS (Succès: {successful_calls}/{n_lhs_target})"
             else:
                 phase_str = f"Phase EXPLOITATION BAYÉSIENNE (Succès: {successful_calls}/{n_successful_calls_target})"
-                using_lhs = False
                 
             print(f"\n--- Itération globale n°{iteration_total} | {phase_str} ---")
             print(f"Paramètres testés : {[round(p, 2) for p in next_x]}")
 
             try:
-                # 3. Exécution FEniCSx
+                # Exécution du calcul
                 error = compute_hill_raw_h5_error_from_parameters(f, next_x)
                 print(f"-> Succès ! Error calculée : {error}")
                 
-                # Envoi du succès à l'optimiseur pour qu'il mette à jour son processus gaussien
                 opt.tell(next_x, error)
                 
                 successful_calls += 1
                 history_err.append(error)
                 history_params.append(next_x)
                 
-                # Choix du prochain point selon la phase actuelle
                 if successful_calls < n_successful_calls_target:
                     if successful_calls < n_lhs_target:
-                        # On continue de piocher dans notre réserve LHS
-                        next_x = lhs_points[lhs_index]
-                        lhs_index += 1
+                        next_x = get_next_lhs_point()
                     else:
-                        # L'apprentissage est validé, on laisse l'optimiseur décider (Exploitation)
                         next_x = opt.ask()
                 
-                # Rafraîchissement graphique
+                # Plotting
                 try:
                     data_p = np.array(history_params)
                     ax_err.clear()
@@ -749,59 +745,34 @@ def femu(
                         ax_params[i].plot(data_p[:, i], color='royalblue')
                         ax_params[i].set_title(f"P{i}: {next_x[i]:.2e}", fontsize=9)
                         ax_params[i].grid(True, alpha=0.2)
-                    
                     plt.tight_layout()
                     plt.pause(0.001)
                 except:
                     pass
 
-            except RuntimeError as e:
-                # 4. GESTION DES DIVERGENCES
-                print(f"--> [DIVERGENCE FEniCSx] Le solveur n'a pas convergé.")
-                print(f"--> Point rejeté. Le compteur de succès n'augmente pas.")
+            except (RuntimeError, Exception, ValueError) as e:
+                # Intercepte TOUS les rejets (FEniCSx ou pré-filtrage mécanique)
+                print(f"--> [REJET / CRASH] : {e}")
+                print(f"--> Point écarté. Le compteur de succès n'augmente pas.")
                 
-                # On pénalise le point pour que skopt n'y revienne plus
+                # On pénalise l'optimiseur
                 opt.tell(next_x, 500.0)
                 
-                # Calcul du point de remplacement
                 if successful_calls < n_lhs_target:
-                    # En phase d'apprentissage : on passe simplement au point LHS suivant de notre réserve
-                    print("--> Phase d'apprentissage : Pioche du point LHS suivant dans la réserve.")
-                    next_x = lhs_points[lhs_index]
-                    lhs_index += 1
-                    
-                    # Sécurité : si on arrive au bout des 50 points de la réserve, on en régénère
-                    if lhs_index >= len(lhs_points):
-                        print("--> Réserve LHS épuisée, génération de points supplémentaires...")
-                        lhs_points = lhs_sampler.generate(dimensions, n_samples=20, random_state=iteration_total)
-                        lhs_index = 0
-                else:
-                    # En phase d'exploitation : on redemande une suggestion à l'algorithme
-                    next_x = opt.ask()
-                
-            except Exception as e:
-                print(f"--> [ERREUR INATTENDUE] : {e}")
-                opt.tell(next_x, 500.0)
-                if successful_calls < n_lhs_target:
-                    next_x = lhs_points[lhs_index]
-                    lhs_index += 1
+                    next_x = get_next_lhs_point()
                 else:
                     next_x = opt.ask()
 
     plt.ioff()
     plt.show()
     
-    # Extraction du meilleur résultat
     best_index = np.argmin(opt.yi)
     print("\n--- OPTIMISATION TERMINÉE ---")
     print(f"Nombre total d'essais (Valides + Échecs) : {iteration_total}")
-    print(f"Succès en phase LHS (Apprentissage) : {n_lhs_target}")
-    print(f"Succès totaux enregistrés : {successful_calls}")
     print("Meilleurs paramètres trouvés :", opt.Xi[best_index])
     print("Plus petite erreur obtenue :", opt.yi[best_index])
     
     return opt
-
 
 
 if __name__ == "__main__":
