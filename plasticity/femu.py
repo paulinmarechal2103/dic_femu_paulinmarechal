@@ -100,7 +100,26 @@ def compute_u_sim_raw_h5_diff(f, u_sim, base_path = "Function/displacement"):
 #     diffs = compute_u_sim_raw_h5_diff(f, u)
 #     print(f"Différence totale : {diffs}")
 
-
+def is_hill48_physically_valid(params):
+    # params = [E, nu, sigma_Y, Q, k, F, G, H, L, M, N]
+    F, G, H, L, M, N = params[5:11]
+    
+    # 1. Positivité stricte
+    if any(p <= 1e-6 for p in [F, G, H, L, M, N]):
+        return False
+    
+    # 2. Conditions de convexité pratique (ratios raisonnables)
+    if (F+G) <= 0 or (G+H) <= 0 or (H+F) <= 0:
+        return False
+    if max(F,G,H,L,M,N) / min(F,G,H,L,M,N) > 5.0:  # Évite les anisotropies extrêmes
+        return False
+        
+    # 3. Cohérence écrouissage / élasticité
+    E, Q, k = params[0], params[3], params[4]
+    if Q * k > 0.15 * E:  # Tangente initiale de Voce trop raide vs module élastique
+        return False
+        
+    return True
 
 def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.900, 0.600, 0.400, 1.7, 1.3, 1.350]): 
     """
@@ -135,6 +154,10 @@ def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0
     M = params[9],  # Cisaillement hors-plan (souvent supposé isotrope = 1.5)
     N = params[10] 
     )
+
+    if not is_hill48_physically_valid(params):
+        print("--> [REJET PRÉ-FEM] Paramètres non physiques ou Hill48 non convexe.")
+        raise RuntimeError("Hill48 non convexe ou paramètres non physiques")
 
     modèle_hill48 = Hill48Model(
         elastic=ElasticModel(hill_params["E"], hill_params["nu"], tdim=3),
@@ -262,7 +285,7 @@ bounds_ref = [
     (150_000, 250_000),   # E [MPa] : acier, OK
     (0.25, 0.35),         # nu : métaux typiques
     (10.0, 500.0),        # sigma_Y [MPa] : large mais valide
-    (0.0, 750.0),         # Q_var [MPa] : découplé, à contraindre séparément si besoin
+    (0.0, 400),         # Q_var [MPa] : découplé, à contraindre séparément si besoin
     (5.0, 50),          # k_hardening : CORRECTION CRITIQUE
     (0.3, 1.2),           # F : Hill, élargi légèrement
     (0.3, 1.2),           # G : Hill
@@ -612,10 +635,14 @@ def femu_V5(
 
 from skopt.sampler import Lhs
 
+
+
 def femu(
         h5_file,
         params0=[200_500.0, 0.29, 105.0, 52.0, 8.0, 0.52, 0.52, 0.48, 1.52, 1.48, 1.45],
-        bounds=bounds_ref
+        bounds=bounds_ref,
+        n_lhs_target = 25,                
+        n_successful_calls_target = 60,
     ):
     """
     Par défaut, si l'échantillonnage par Hypercube Latin (LHS) génère 25 points et que 5 d'entre eux font planter FEniCSx, 
@@ -651,9 +678,6 @@ def femu(
         random_state=42
     )
 
-    # Objectifs de la simulation
-    n_lhs_target = 25                # Nombre ciblé de VRAIS succès LHS pour l'apprentissage
-    n_successful_calls_target = 60    # Nombre TOTAL ciblé de simulations réussies (LHS + Exploitation)
     
     successful_calls = 0
     iteration_total = 0
@@ -689,7 +713,7 @@ def femu(
                 
             print(f"\n--- Itération globale n°{iteration_total} | {phase_str} ---")
             print(f"Paramètres testés : {[round(p, 2) for p in next_x]}")
-            
+
             try:
                 # 3. Exécution FEniCSx
                 error = compute_hill_raw_h5_error_from_parameters(f, next_x)
@@ -781,4 +805,4 @@ def femu(
 
 
 if __name__ == "__main__":
-    optimizer_result = femu("femu_files/res.h5", None)
+    optimizer_result = femu("femu_files/res.h5", None, bounds_ref, 35, 70)
