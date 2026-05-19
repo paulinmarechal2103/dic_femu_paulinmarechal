@@ -13,9 +13,10 @@ A Python framework dedicated to VIC-2D/3D Digital Image Correlation (DIC) data e
 Due to complex scientific dependencies, it is highly recommended to use Conda (or Mamba if Conda is crashing) to manage your virtual environment.
 
 ### 1. Create the Environment
-
-Execute the following command to create a dedicated environment named `femu_env` containing all required packages from the `conda-forge` channel:
+Using the `environement.yml` file, execute the following command to create a dedicated environment named `femu_env` containing all required packages :
 
 ```bash
-conda create -n femu_env -c conda-forge python=3.11 fenics-dolfinx=0.10.0 mpich petsc h5py numpy scipy matplotlib meshio pyvista scikit-optimize
+conda env create -f environnement.yml
+```
+
 
