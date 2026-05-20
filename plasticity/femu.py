@@ -157,9 +157,9 @@ def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0
     N = params[10] 
     )
 
-    if not is_hill48_physically_valid(params):
-        print("--> [REJET PRÉ-FEM] Paramètres non physiques ou Hill48 non convexe.")
-        raise ValueError("Hill48 non convexe ou paramètres non physiques")
+    # if not is_hill48_physically_valid(params):
+    #     print("--> [REJET PRÉ-FEM] Paramètres non physiques ou Hill48 non convexe.")
+    #     raise ValueError("Hill48 non convexe ou paramètres non physiques")
 
     modèle_hill48 = Hill48Model(
         elastic=ElasticModel(hill_params["E"], hill_params["nu"], tdim=3),
@@ -182,6 +182,20 @@ def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0
 #     print(f"Différence totale : {diffs}")
 
 
+bounds_ref = [
+    (150_000, 250_000),   # E [MPa]
+    (0.25, 0.35),         # nu 
+    (10.0, 500.0),        # sigma_Y [MPa]
+    (0.0, 400.0),         # Q_var [MPa]
+    (5.0, 50.0),          # k_hardening
+    (0.3, 1.3),           # F : Hill, resserré (évite les rapports d'anisotropie > 3)
+    (0.3, 1.3),           # G : Hill, resserré
+    (0.2, 1.0),           # H : Hill, resserré
+    (0.8, 1.8),           # L : cisaillement hors-plan, resserré
+    (0.8, 1.8),           # M : cisaillement hors-plan, resserré
+    (0.6, 1.6),           # N : cisaillement plan, cohérent avec H et resserré
+]
+
 
 
 def femu_V1(h5_file, params0 = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.900, 0.600, 0.400, 1.7, 1.3, 1.350]):
@@ -195,21 +209,6 @@ def femu_V1(h5_file, params0 = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.900, 0.6
     return result
 
 
-
-
-bounds_ref = [
-    (150_000, 250_000),   # E [MPa] : acier, OK
-    (0.25, 0.35),         # nu : métaux typiques
-    (10.0, 500.0),        # sigma_Y [MPa] : large mais valide
-    (0.0, 750.0),         # Q_var [MPa] : découplé, à contraindre séparément si besoin
-    (5.0, 80.0),          # k_hardening : CORRECTION CRITIQUE
-    (0.3, 1.2),           # F : Hill, élargi légèrement
-    (0.3, 1.2),           # G : Hill
-    (0.4, 1.0),           # H : Hill, restreint pour éviter R45 extrême
-    (1.0, 2.5),           # L : cisaillement hors-plan
-    (0.8, 2.0),           # M : cisaillement hors-plan
-    (0.6, 1.8),           # N : cisaillement plan, cohérent avec H
-]
 
 def femu_V2(
         h5_file,
@@ -282,20 +281,6 @@ def femu_V2(
 
 
 
-
-bounds_ref = [
-    (150_000, 250_000),   # E [MPa] : acier, OK
-    (0.25, 0.35),         # nu : métaux typiques
-    (10.0, 500.0),        # sigma_Y [MPa]
-    (0.0, 400.0),         # Q_var [MPa]
-    (5.0, 50.0),          # k_hardening
-    (0.3, 1.3),           # F : Hill, resserré (évite les rapports d'anisotropie > 3)
-    (0.3, 1.3),           # G : Hill, resserré
-    (0.2, 1.0),           # H : Hill, resserré
-    (0.8, 1.8),           # L : cisaillement hors-plan, resserré
-    (0.8, 1.8),           # M : cisaillement hors-plan, resserré
-    (0.6, 1.6),           # N : cisaillement plan, cohérent avec H et resserré
-]
 
 def femu_V3(
         h5_file,
@@ -775,5 +760,10 @@ def femu(
     return opt
 
 
+
 if __name__ == "__main__":
-    optimizer_result = femu("femu_files/res.h5", None, bounds_ref, 35, 70)
+    optimizer_result = femu_V5("femu_files/res.h5", None, bounds_ref)
+
+
+# if __name__ == "__main__":
+#     optimizer_result = femu("femu_files/res.h5", None, bounds_ref, 35, 70)
