@@ -25,6 +25,14 @@ bounds_ref = [
     (0.6, 1.6),           # N : cisaillement plan, cohérent avec H et resserré
 ]
 
+bounds_ref_elastoplastic = [
+    (150_000, 250_000),   # E [MPa] : acier, OK
+    (0.25, 0.35),         # nu : métaux typiques
+    (10.0, 500.0),        # sigma_Y [MPa]
+    (0.0, 400.0),         # Q_var [MPa]
+    (5.0, 50.0),          # k_hardening
+]
+
 def compute_direct_h5_diff(h5_file1, h5_file2):
     """
     """
@@ -112,7 +120,43 @@ def compute_u_sim_raw_h5_diff(f, u_sim, base_path = "Function/displacement"):
 # with h5py.File("femu_files/donnes_ref.h5", 'r') as f:
 #     diffs = compute_u_sim_raw_h5_diff(f, u)
 #     print(f"Différence totale : {diffs}")
+def compute_elastoplastic_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 50.0, 10]): 
+    """
+    Compute the total displacement difference between 
+    H5 reference raw file extracted with h5py
+    and simulation output array for a given set of parameters.
 
+    params should be a list or array containing the following parameters in order:
+    (E, nu, sigma_Y, Q_var, k_hardening)
+    
+    """
+    params = dict(
+    t_start     = 0.0,
+    T           = 3.0,
+    num_steps   = 50,
+    load_amp    = 0.01,       # amplitude of the applied displacement
+    length      = 10.0,       # half-length of the specimen
+    mesh_file   = "Flat_specimen_refined.msh",
+    output_dir  = "results_plasticity",
+    file_name    = "donnes_ref",
+    # Elastic constants (used when no model is supplied)
+    E           = params[0],
+    nu          = params[1],
+    # J2 isotropic hardening parameters (used when no model is supplied)
+    sigma_Y     = params[2],
+    Q_var       = params[3],
+    k_hardening = params[4],
+    )
+    
+    modèle_J2IsotropicHardening = J2IsotropicHardening(
+        elastic=ElasticModel(params["E"], params["nu"], tdim=3),
+        sigma_Y=params["sigma_Y"],
+        Q_var=params["Q_var"],
+        k=params["k_hardening"]
+    )
+    _, u_sim = run_simulation_V2(params, model=modèle_J2IsotropicHardening, write_output=False)
+    error = compute_u_sim_raw_h5_diff(f, u_sim)
+    return error
 
 def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.900, 0.600, 0.400, 1.7, 1.3, 1.350]): 
     """
@@ -166,13 +210,13 @@ def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0
 
 def femu_optuna(
         h5_file,
-        params0=[200_500.0, 0.29, 105.0, 52.0, 8.0, 0.52, 0.52, 0.48, 1.52, 1.48, 1.45],
-        bounds=bounds_ref,
+        params0=None,
+        bounds=bounds_ref_elastoplastic,
         n_startup_trials=35,
         n_successful_calls_target=70
     ):
 
-    param_names = ['E', 'nu', 'sigma_Y', 'Q_var', 'k_hardening', 'F', 'G', 'H', 'L', 'M', 'N']
+    param_names = ['E', 'nu', 'sigma_Y', 'Q_var', 'k_hardening']
 
     # --- Callback d'arrêt uniquement ---
     def stop_callback(study, trial):
@@ -190,7 +234,7 @@ def femu_optuna(
     # --- Configuration du Stockage SQLite ---
     # C'est ce fichier .db qui va servir de pont avec VS Code
     storage_url = "sqlite:///femu_optimization.db"
-    study_name = "femu_hill48_study"
+    study_name = "femu_elastoplastic_study"
 
     sampler = optuna.samplers.TPESampler(n_startup_trials=n_startup_trials, seed=42, multivariate=True)
     optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -215,9 +259,9 @@ def femu_optuna(
         def objective(trial):
             params = [trial.suggest_float(name, bounds[i][0], bounds[i][1]) for i, name in enumerate(param_names)]
             try:
-                error = compute_hill_raw_h5_error_from_parameters(f, params)
+                error = compute_elastoplastic_raw_h5_error_from_parameters(f, params)
                 return error
-            except (RuntimeError, ValueError, Exception):
+            except (RuntimeError):
                 raise optuna.exceptions.TrialPruned()
 
         study.optimize(objective, n_trials=None, callbacks=[stop_callback])
