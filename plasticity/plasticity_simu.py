@@ -665,6 +665,72 @@ def run_simulation(config=None, model: PlasticityModel = None):
     return force_vec, displ_val
 
 
+def compute_erc_residual(config, model: PlasticityModel, h5_filepath, base_path="Function/displacement"):
+    """
+    Évalue la fonctionnelle d'Erreur en Relation de Comportement (ERC).
+    Injecte le champ de déplacement expérimental et mesure le résidu d'équilibre.
+    """
+    cfg = {**DEFAULT_CONFIG, **(config or {})}
+    
+    # 1. Chargement du maillage et des espaces de fonctions
+    domain = load_and_write_mesh(cfg["mesh_file"])
+    V, W, WT = build_function_spaces(domain)
+    
+    # Initialisation de l'état plastique
+    state = model.create_state(domain, W, WT)
+    
+    # Éléments UFL pour le calcul du résidu
+    dx = ufl.Measure("dx", domain=domain, metadata={"quadrature_degree": 2})
+    v = ufl.TestFunction(V)
+    u_exp = fem.Function(V)
+    
+    # --- CORRECTION MÉCANIQUE : Identification des DOFs aux limites ---
+    # On identifie les nœuds où le déplacement est imposé pour exclure leurs réactions
+    fdim = domain.topology.dim - 1
+    length = cfg["length"]
+    left_facets  = mesh.locate_entities_boundary(domain, fdim, lambda x: x[0] <= (-length + 1e-8))
+    right_facets = mesh.locate_entities_boundary(domain, fdim, lambda x: x[0] >= (+length - 1e-8))
+    
+    dofs_left  = fem.locate_dofs_topological(V, fdim, left_facets)
+    dofs_right = fem.locate_dofs_topological(V, fdim, right_facets)
+    boundary_dofs = np.concatenate([dofs_left, dofs_right])
+    
+    total_erc = 0.0
+    
+    import h5py
+    with h5py.File(h5_filepath, 'r') as f_h5:
+        step = 0
+        while str(step) in f_h5[base_path]:
+            # --- CORRECTION 1 : .ravel() pour aplatir le tableau ---
+            u_exp.x.array[:] = f_h5[f"{base_path}/{step}"][:].ravel()
+            
+            # Mise à jour des ghost cells (important pour la cohérence FEniCSx)
+            u_exp.x.scatter_forward()
+            
+            # --- 2. Évaluation de la loi de comportement ---
+            eps = model.elastic.epsilon(u_exp)
+            delta_p, delta_eps_p = model.update(state, eps)
+            stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
+            
+            # --- 3. Calcul des forces résiduelles d'équilibre ---
+            F_int = ufl.inner(stress, ufl.sym(ufl.grad(v))) * dx
+            residual_form = fem.form(F_int)
+            b = fem.petsc.assemble_vector(residual_form)
+            b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+            
+            # --- CORRECTION MÉCANIQUE 2 : Forcer le résidu à 0 sur les frontières ---
+            # On ne mesure le non-équilibre QUE sur les nœuds internes libres
+            b.array[boundary_dofs] = 0.0
+            
+            # Calcul de la norme du résidu d'équilibre interne
+            step_error = b.norm()
+            total_erc += step_error**2
+            
+            # --- 4. Incrémentation de l'état plastique pour le pas de temps suivant ---
+            model.commit(state, u_exp)
+            step += 1
+
+    return total_erc
 
 # ===========================================================================
 # Main simulation loop -------- V2 -------
