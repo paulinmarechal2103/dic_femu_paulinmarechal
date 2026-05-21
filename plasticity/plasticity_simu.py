@@ -306,6 +306,7 @@ class J2IsotropicHardening(PlasticityModel):
 # ===========================================================================
 # Mesh utilities
 # ===========================================================================
+
 def create_mesh(msh, cell_type, prune_z=True):
     """
     Extract a meshio.Mesh of the given *cell_type* from a raw meshio object.
@@ -664,28 +665,20 @@ def run_simulation(config=None, model: PlasticityModel = None):
     #print("Reaction forces:", force_vec)
     return force_vec, displ_val
 
-
-def compute_erc_residual(config, model: PlasticityModel, h5_filepath, base_path="Function/displacement"):
+def compute_erc_residual(config, model: PlasticityModel, f_h5, base_path="Function/displacement"):
     """
-    Évalue la fonctionnelle d'Erreur en Relation de Comportement (ERC).
-    Injecte le champ de déplacement expérimental et mesure le résidu d'équilibre.
+    Évalue l'ERC interne ET extrait les forces de réaction calculées (virtuelles).
     """
     cfg = {**DEFAULT_CONFIG, **(config or {})}
-    
-    # 1. Chargement du maillage et des espaces de fonctions
     domain = load_and_write_mesh(cfg["mesh_file"])
     V, W, WT = build_function_spaces(domain)
-    
-    # Initialisation de l'état plastique
     state = model.create_state(domain, W, WT)
     
-    # Éléments UFL pour le calcul du résidu
     dx = ufl.Measure("dx", domain=domain, metadata={"quadrature_degree": 2})
     v = ufl.TestFunction(V)
     u_exp = fem.Function(V)
     
-    # --- CORRECTION MÉCANIQUE : Identification des DOFs aux limites ---
-    # On identifie les nœuds où le déplacement est imposé pour exclure leurs réactions
+    # Repérage des frontières pour isoler le résidu interne
     fdim = domain.topology.dim - 1
     length = cfg["length"]
     left_facets  = mesh.locate_entities_boundary(domain, fdim, lambda x: x[0] <= (-length + 1e-8))
@@ -695,42 +688,43 @@ def compute_erc_residual(config, model: PlasticityModel, h5_filepath, base_path=
     dofs_right = fem.locate_dofs_topological(V, fdim, right_facets)
     boundary_dofs = np.concatenate([dofs_left, dofs_right])
     
-    total_erc = 0.0
+    total_erc_interne = 0.0
+    forces_calculees = []  # Stockage de la force globale à chaque pas
     
-    import h5py
-    with h5py.File(h5_filepath, 'r') as f_h5:
-        step = 0
-        while str(step) in f_h5[base_path]:
-            # --- CORRECTION 1 : .ravel() pour aplatir le tableau ---
-            u_exp.x.array[:] = f_h5[f"{base_path}/{step}"][:].ravel()
-            
-            # Mise à jour des ghost cells (important pour la cohérence FEniCSx)
-            u_exp.x.scatter_forward()
-            
-            # --- 2. Évaluation de la loi de comportement ---
-            eps = model.elastic.epsilon(u_exp)
-            delta_p, delta_eps_p = model.update(state, eps)
-            stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
-            
-            # --- 3. Calcul des forces résiduelles d'équilibre ---
-            F_int = ufl.inner(stress, ufl.sym(ufl.grad(v))) * dx
-            residual_form = fem.form(F_int)
-            b = fem.petsc.assemble_vector(residual_form)
-            b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
-            
-            # --- CORRECTION MÉCANIQUE 2 : Forcer le résidu à 0 sur les frontières ---
-            # On ne mesure le non-équilibre QUE sur les nœuds internes libres
-            b.array[boundary_dofs] = 0.0
-            
-            # Calcul de la norme du résidu d'équilibre interne
-            step_error = b.norm()
-            total_erc += step_error**2
-            
-            # --- 4. Incrémentation de l'état plastique pour le pas de temps suivant ---
-            model.commit(state, u_exp)
-            step += 1
+    step = 0
+    while str(step) in f_h5[base_path]:
+        # 1. Injection du déplacement expérimental
+        u_exp.x.array[:] = f_h5[f"{base_path}/{step}"][:].ravel()
+        u_exp.x.scatter_forward()
+        
+        # 2. Calcul du champ de contraintes associé aux paramètres testés
+        eps = model.elastic.epsilon(u_exp)
+        delta_p, delta_eps_p = model.update(state, eps)
+        stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
+        
+        # 3. Assemblage du vecteur des forces
+        F_int = ufl.inner(stress, ufl.sym(ufl.grad(v))) * dx
+        residual_form = fem.form(F_int)
+        b = fem.petsc.assemble_vector(residual_form)
+        b.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+        
+        # --- CALCUL DE LA FORCE GLOBALE DE TRACTION (sur la frontière droite) ---
+        # La force totale sur la section est la somme des réactions sur les dofs de droite 
+        # (en direction X, soit le premier Dof de chaque nœud concerné)
+        force_traction_step = np.sum(b.array[dofs_right])
+        forces_calculees.append(force_traction_step)
+        
+        # --- NETTOYAGE POUR L'ERC INTERNE ---
+        # On annule les réactions aux limites pour ne mesurer que le non-équilibre interne
+        b.array[boundary_dofs] = 0.0
+        
+        step_error = b.norm()
+        total_erc_interne += step_error**2
+        
+        model.commit(state, u_exp)
+        step += 1
 
-    return total_erc
+    return total_erc_interne, np.array(forces_calculees)
 
 # ===========================================================================
 # Main simulation loop -------- V2 -------
@@ -790,6 +784,7 @@ def run_simulation_V2(config=None, model: PlasticityModel = None, write_output: 
     # ------------------------------------------------------------ time loop
     force_vec  = []
     displ_val  = []
+    eps_val    = []
     t_paraview = 0
 
     # Silence PETSc/SNES logs for cleaner FEMU output
@@ -813,6 +808,9 @@ def run_simulation_V2(config=None, model: PlasticityModel = None, write_output: 
         current_displ = uh.x.array.copy()
         displ_val.append(current_displ)
 
+        eps_proj = fem.Function(WT)
+        eps_proj.interpolate(fem.Expression(eps, WT.element.interpolation_points))
+        eps_val.append(eps_proj.x.array.copy())
         # Contrainte & Force de réaction
         stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
         force  = fem.assemble_scalar(fem.form(stress[0, 0] * ds(1)))
@@ -826,8 +824,6 @@ def run_simulation_V2(config=None, model: PlasticityModel = None, write_output: 
             fic.write_function(uh, t_paraview)
 
             # Total strain
-            eps_proj = fem.Function(WT)
-            eps_proj.interpolate(fem.Expression(eps, WT.element.interpolation_points))
             eps_proj.name = "Epsilon"
             fic.write_function(eps_proj, t_paraview)
 
@@ -899,7 +895,17 @@ def run_simulation_V2(config=None, model: PlasticityModel = None, write_output: 
     if fic is not None:
         fic.close()
 
-    return force_vec, displ_val
+    # --- AJOUT : Écriture des forces directement dans le fichier H5 sous-jacent ---
+    if write_output:
+        h5_filename = f"{cfg['output_dir']}/{cfg['file_name']}.h5"
+        if os.path.exists(h5_filename):
+            with h5py.File(h5_filename, "r+") as f_h5:
+                # On crée un groupe "Force" et on y stocke le tableau des forces
+                if "Force" in f_h5:
+                    del f_h5["Force"] # On efface l'ancien si existant
+                f_h5.create_dataset("Force/value", data=np.array(force_vec))
+
+    return force_vec, displ_val, eps_val
 
 
 

@@ -123,6 +123,41 @@ def is_hill48_physically_valid(params):
         
     return True
 
+
+def compute_eps_sim_raw_h5_diff(f, eps_sim, base_path="Function/Epsilon"):
+    """
+    Calcule la somme des normes des différences d'epsilon entre 
+    le fichier H5 de référence et les données issues de la simulation.
+    """
+    errors = []
+    step = 0
+    
+    while str(step) in f[base_path]:
+        # Données de référence issues du H5 (souvent de forme (N, 3) ou (N, 6))
+        d1 = f[f"{base_path}/{step}"][:]
+        
+        # Données issues de la simulation actuelle (tableau 1D)
+        d2 = eps_sim[step]
+        
+        # Sécurité : On s'assure que d2 prend la même forme géométrique que d1
+        try:
+            d2 = d2.reshape(d1.shape)
+        except ValueError as e:
+            raise ValueError(
+                f"Impossible de d'ajuster la forme de la simulation ({d2.shape}) "
+                f"avec celle du H5 ({d1.shape}) au pas {step}."
+            ) from e
+        
+        # Calcul de la norme de la différence (Equivaut à la racine de la somme des carrés)
+        diff = np.linalg.norm(d1 - d2)
+        errors.append(diff)
+        
+        step += 1
+
+    # Retourne la somme sur tous les pas de temps (comme demandé)
+    return np.sum(errors)
+
+
 def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.900, 0.600, 0.400, 1.7, 1.3, 1.350]): 
     """
     Compute the total displacement difference between 
@@ -176,6 +211,62 @@ def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0
     _, u_sim = run_simulation_V2(hill_params, model=modèle_hill48, write_output=False)
     error = compute_u_sim_raw_h5_diff(f, u_sim)
     return error
+
+def compute_hill_raw_h5_eps_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.900, 0.600, 0.400, 1.7, 1.3, 1.350]): 
+    """
+    Compute the total displacement difference between 
+    H5 reference raw file extracted with h5py
+    and simulation output array for a given set of Hill48 parameters.
+
+    params should be a list or array containing the following parameters in order:
+    (E, nu, sigma_Y, Q_var, k_hardening, F, G, H, L, M, N)
+    
+    """
+    hill_params = dict(
+    t_start     = 0.0,
+    T           = 3.0,
+    num_steps   = 50,
+    load_amp    = 0.01,       # amplitude of the applied displacement
+    length      = 10.0,       # half-length of the specimen
+    mesh_file   = "Flat_specimen_refined.msh",
+    output_dir  = "results_plasticity",
+    file_name    = "donnes_ref",
+    # Elastic constants (used when no model is supplied)
+    E           = params[0],
+    nu          = params[1],
+    # J2 isotropic hardening parameters (used when no model is supplied)
+    sigma_Y     = params[2],
+    Q_var       = params[3],
+    k_hardening = params[4],
+    F = params[5],  # Anisotropie dans le plan transverse
+    G = params[6],  # Anisotropie dans le plan longitudinal
+    H = params[7],  # Terme d'interaction (souvent proche de 0.5)
+    L = params[8],  # Cisaillement hors-plan (souvent supposé isotrope = 1.5)
+    M = params[9],  # Cisaillement hors-plan (souvent supposé isotrope = 1.5)
+    N = params[10] 
+    )
+
+    # if not is_hill48_physically_valid(params):
+    #     print("--> [REJET PRÉ-FEM] Paramètres non physiques ou Hill48 non convexe.")
+    #     raise ValueError("Hill48 non convexe ou paramètres non physiques")
+
+    modèle_hill48 = Hill48Model(
+        elastic=ElasticModel(hill_params["E"], hill_params["nu"], tdim=3),
+        sigma_Y=hill_params["sigma_Y"],
+        H=hill_params["H"],
+        F=hill_params["F"],
+        G=hill_params["G"],
+        L=hill_params["L"],
+        M=hill_params["M"],
+        N=hill_params["N"],
+        Q_var=hill_params["Q_var"],
+        k_hardening=hill_params["k_hardening"]
+    )
+    _, _, eps_sim = run_simulation_V2(hill_params, model=modèle_hill48, write_output=False)
+    error = compute_eps_sim_raw_h5_diff(f, eps_sim)
+    return error
+
+
 
 # with h5py.File("femu_files/res.h5", 'r') as f:
 #     diffs = compute_hill_raw_h5_error_from_parameters(f)
@@ -554,7 +645,7 @@ def femu_V5(
             
             try:
                 # 2. Exécution de FEniCSx
-                error = compute_hill_raw_h5_error_from_parameters(f, next_x)
+                error = compute_hill_raw_h5_eps_error_from_parameters(f, next_x)
                 print(f"-> Succès ! Error calculée : {error}")
                 
                 # Envoi du résultat valide à l'optimiseur

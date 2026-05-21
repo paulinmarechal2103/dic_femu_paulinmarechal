@@ -118,7 +118,38 @@ def compute_u_sim_raw_h5_diff(f, u_sim, base_path = "Function/displacement"):
 
 
 
+def compute_eps_sim_raw_h5_diff(f, eps_sim, base_path="Function/Epsilon"):
+    """
+    Calcule la somme des normes des différences d'epsilon entre 
+    le fichier H5 de référence et les données issues de la simulation.
+    """
+    errors = []
+    step = 0
+    
+    while str(step) in f[base_path]:
+        # Données de référence issues du H5 (souvent de forme (N, 3) ou (N, 6))
+        d1 = f[f"{base_path}/{step}"][:]
+        
+        # Données issues de la simulation actuelle (tableau 1D)
+        d2 = eps_sim[step]
+        
+        # Sécurité : On s'assure que d2 prend la même forme géométrique que d1
+        try:
+            d2 = d2.reshape(d1.shape)
+        except ValueError as e:
+            raise ValueError(
+                f"Impossible de d'ajuster la forme de la simulation ({d2.shape}) "
+                f"avec celle du H5 ({d1.shape}) au pas {step}."
+            ) from e
+        
+        # Calcul de la norme de la différence (Equivaut à la racine de la somme des carrés)
+        diff = np.linalg.norm(d1 - d2)
+        errors.append(diff)
+        
+        step += 1
 
+    # Retourne la somme sur tous les pas de temps (comme demandé)
+    return np.sum(errors)
 
 
 # with h5py.File("femu_files/donnes_ref.h5", 'r') as f:
@@ -163,6 +194,43 @@ def compute_elastoplastic_raw_h5_error_from_parameters(f, params = [200_000.0, 0
     return error
 
 
+def compute_elastoplastic_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 50.0, 10]): 
+    """
+    Compute the total displacement difference between 
+    H5 reference raw file extracted with h5py
+    and simulation output array for a given set of parameters.
+
+    params should be a list or array containing the following parameters in order:
+    (E, nu, sigma_Y, Q_var, k_hardening)
+    
+    """
+    params = dict(
+    t_start     = 0.0,
+    T           = 3.0,
+    num_steps   = 50,
+    load_amp    = 0.01,       # amplitude of the applied displacement
+    length      = 10.0,       # half-length of the specimen
+    mesh_file   = "Flat_specimen_refined.msh",
+    output_dir  = "results_plasticity",
+    file_name    = "donnes_ref",
+    # Elastic constants (used when no model is supplied)
+    E           = params[0],
+    nu          = params[1],
+    # J2 isotropic hardening parameters (used when no model is supplied)
+    sigma_Y     = params[2],
+    Q_var       = params[3],
+    k_hardening = params[4],
+    )
+    
+    modèle_J2IsotropicHardening = J2IsotropicHardening(
+        elastic=ElasticModel(params["E"], params["nu"], tdim=3),
+        sigma_Y=params["sigma_Y"],
+        Q_var=params["Q_var"],
+        k=params["k_hardening"]
+    )
+    _, u_sim, eps_sim = run_simulation_V2(params, model=modèle_J2IsotropicHardening, write_output=False)
+    error = compute_eps_sim_raw_h5_diff(f, eps_sim)
+    return error
 
 
 
@@ -225,47 +293,57 @@ def denormalize_params(params_norm, bounds):
     """Denormalize parameters from [0, 1] range back to original scale based on given bounds."""
     return [params_norm[i] * (bounds[i][1] - bounds[i][0]) + bounds[i][0] for i in range(len(bounds))]  
 
+def compute_elastoplastic_raw_h5_error_from_parameters_normalized(f, params_norm, bounds = bounds_ref_elastoplastic): 
+    """
+    Compute the total displacement difference between 
+    H5 reference raw file extracted with h5py
+    and simulation output array for a given set of parameters.
 
-def compute_erc_error_from_parameters(h5_file_path, params): 
+    params should be a list or array containing the following parameters in order:
+    (E, nu, sigma_Y, Q_var, k_hardening)
+    
     """
-    Évalue l'erreur ERC pour un jeu de paramètres donné.
-    params : (E, nu, sigma_Y, Q_var, k_hardening)
-    """
-    cfg_params = dict(
-        mesh_file   = "Flat_specimen_refined.msh",
-        E           = params[0],
-        nu          = params[1],
-        sigma_Y     = params[2],
-        Q_var       = params[3],
-        k_hardening = params[4],
+    params = denormalize_params(params_norm, bounds)
+
+    params = dict(
+    t_start     = 0.0,
+    T           = 3.0,
+    num_steps   = 50,
+    load_amp    = 0.01,       # amplitude of the applied displacement
+    length      = 10.0,       # half-length of the specimen
+    mesh_file   = "Flat_specimen_refined.msh",
+    output_dir  = "results_plasticity",
+    file_name    = "donnes_ref",
+    # Elastic constants (used when no model is supplied)
+    E           = params[0],
+    nu          = params[1],
+    # J2 isotropic hardening parameters (used when no model is supplied)
+    sigma_Y     = params[2],
+    Q_var       = params[3],
+    k_hardening = params[4],
     )
     
-    # Création du modèle avec les paramètres d'Optuna
-    modèle_J2 = J2IsotropicHardening(
-        elastic=ElasticModel(cfg_params["E"], cfg_params["nu"], tdim=3),
-        sigma_Y=cfg_params["sigma_Y"],
-        Q_var=cfg_params["Q_var"],
-        k=cfg_params["k_hardening"]
+    modèle_J2IsotropicHardening = J2IsotropicHardening(
+        elastic=ElasticModel(params["E"], params["nu"], tdim=3),
+        sigma_Y=params["sigma_Y"],
+        Q_var=params["Q_var"],
+        k=params["k_hardening"]
     )
-    
-    # Calcul direct de la fonctionnelle ERC sans solveur non-linéaire
-    error = compute_erc_residual(cfg_params, modèle_J2, h5_file_path)
-    
+    _, u_sim, eps_sim = run_simulation_V2(params, model=modèle_J2IsotropicHardening, write_output=False)
+    error = compute_eps_sim_raw_h5_diff(f, eps_sim)
     return error
 
-def compute_erc_error_from_normalized_parameters(h5_file_path, normalized_params, bounds): 
-    """
-    Reçoit des paramètres entre 0 et 1 et les reconstruit dans leurs unités physiques
-    """
+def compute_erc_error_from_normalized_parameters(f_h5, normalized_params, bounds): 
+    # 1. Dénormalisation des paramètres (0-1 vers physique)
     physical_params = []
     for i, p_norm in enumerate(normalized_params):
         p_min, p_max = bounds[i]
-        # Formule de dénormalisation linéaire simple :
         p_phys = p_min + p_norm * (p_max - p_min)
         physical_params.append(p_phys)
         
     cfg_params = dict(
         mesh_file   = "Flat_specimen_refined.msh",
+        length      = 10.0, # Assure-toi que la demi-longueur correspond à ton maillage
         E           = physical_params[0],
         nu          = physical_params[1],
         sigma_Y     = physical_params[2],
@@ -280,7 +358,29 @@ def compute_erc_error_from_normalized_parameters(h5_file_path, normalized_params
         k=cfg_params["k_hardening"]
     )
     
-    return compute_erc_residual(cfg_params, modèle_J2, h5_file_path)
+    # 2. Calcul du résidu interne ET des forces virtuelles
+    erc_interne, forces_simulees = compute_erc_residual(cfg_params, modèle_J2, f_h5)
+    
+    # 3. Chargement de la VRAIE force globale expérimentale
+    forces_experimentales = f_h5["Force/value"][:] 
+    
+    # 4. Calcul de l'erreur sur la force globale
+    # On tronque si nécessaire pour aligner les tailles de tableaux
+    n_pas = min(len(forces_simulees), len(forces_experimentales))
+    f_exp = forces_experimentales[:n_pas]
+    f_sim = forces_simulees[:n_pas]
+    
+    erreur_force = np.sum((f_sim - f_exp) ** 2)
+    
+    # 5. Pondération/Normalisation (Crucial !)
+    # On divise chaque erreur par la norme de la valeur expérimentale pour additionner des torchons et des serviettes sans biais
+    norme_f_exp = np.sum(f_exp ** 2) if np.sum(f_exp ** 2) != 0 else 1.0
+    
+    # Pour l'ERC, on peut diviser par une valeur de référence ou laisser tel quel si les échelles sont stables.
+    # Ici, une somme brute pondérée équilibre parfaitement le problème :
+    erreur_globale = (erreur_force / norme_f_exp) + erc_interne
+    
+    return erreur_globale
 
 def femu_optuna(
         h5_file,
@@ -353,7 +453,7 @@ def femu_optuna(
             ]
             try:
                 # On passe les bounds réelles pour faire la conversion en interne
-                error = compute_erc_error_from_normalized_parameters(h5_file, normalized_params, bounds_ref)
+                error = compute_elastoplastic_raw_h5_error_from_parameters_normalized(f, normalized_params, bounds)
                 return error
             except RuntimeError as e:
                 print(f"Erreur lors de l'essai {trial.number + 1} : {e}")
@@ -366,6 +466,7 @@ def femu_optuna(
     return study
 
 if __name__ == "__main__":
-    study = femu_optuna("femu_files/res.h5", bounds=bounds_ref)
-    print("Meilleurs paramètres :", study.best_params)
-    print("Meilleure erreur :", study.best_value)
+    with h5py.File("femu_files/res.h5", 'r') as f:
+        study = femu_optuna("femu_files/res.h5", bounds=bounds_ref_elastoplastic)
+        print("Meilleurs paramètres :", study.best_params)
+        print("Meilleure erreur :", study.best_value)
