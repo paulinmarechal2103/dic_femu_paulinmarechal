@@ -810,7 +810,7 @@ def run_simulation_V2(config=None, model: PlasticityModel = None, write_output: 
 
         eps_proj = fem.Function(WT)
         eps_proj.interpolate(fem.Expression(eps, WT.element.interpolation_points))
-        eps_val.append(eps_proj.x.array.copy())
+        eps_val.append(eps_proj.x.array.copy()) 
         # Contrainte & Force de réaction
         stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
         force  = fem.assemble_scalar(fem.form(stress[0, 0] * ds(1)))
@@ -824,6 +824,8 @@ def run_simulation_V2(config=None, model: PlasticityModel = None, write_output: 
             fic.write_function(uh, t_paraview)
 
             # Total strain
+            eps_proj = fem.Function(WT)
+            eps_proj.interpolate(fem.Expression(eps, WT.element.interpolation_points))
             eps_proj.name = "Epsilon"
             fic.write_function(eps_proj, t_paraview)
 
