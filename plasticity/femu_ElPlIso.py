@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 femu.py
 =======
@@ -36,7 +37,7 @@ os.environ["DOLFINX_JIT_TIMEOUT"] = "300" # 10 minutes d'attente max !
 # ---------------------------------------------------------------------------
 # Imports
 # ---------------------------------------------------------------------------
-from __future__ import annotations
+
 
 import os
 import time
@@ -169,7 +170,7 @@ class FEMUEvaluator:
     @staticmethod
     def _is_physical(theta: np.ndarray) -> bool:
         E, nu, sigma_Y, Q_var, k = theta
-        return (E > 0) and (0 < nu < 0.5) and (sigma_Y > 0) and (Q_var >= 0) and (k > 0)
+        return (E > 0) and (0 < nu < 0.5) and (sigma_Y > 0) and (Q_var >= 0) and (k > 0) #and not (Q_var * k > 0.15 * E)
 
     # ------------------------------------------------------------------
     # FEMU-Epsilon : résidu sur les déformations
@@ -475,14 +476,14 @@ if __name__ == "__main__":
         nu       = 0.3,
         sigma_Y  = 100.0,
         Q_var    = 50.0,
-        k        = 10.0,
+        k        = 1000.0,
     )
 
     REF_CONFIG = dict(
         mesh_file   = "Flat_specimen_refined.msh",
-        output_dir  = "femu_files",
-        file_name   = "res",
-        num_steps   = 30,
+        output_dir  = "femu_files_test",
+        file_name   = "res_test",
+        num_steps   = 2,
         T           = 3.0,
         load_amp    = 0.01,
         length      = 10.0,
@@ -518,7 +519,7 @@ if __name__ == "__main__":
         0.25,        # nu
         85.0,        # σ_Y
         40.0,        # Q
-        8.0,         # k
+        900.0,         # k
     ]
 
     BOUNDS = [
@@ -526,7 +527,7 @@ if __name__ == "__main__":
         (0.05,     0.45),        # nu
         (10.0,     500.0),       # σ_Y
         (0.0,      300.0),       # Q
-        (0.1,      200.0),       # k
+        (0.1,      2000.0),       # k
     ]
 
     result, problem = run_femu_identification(
