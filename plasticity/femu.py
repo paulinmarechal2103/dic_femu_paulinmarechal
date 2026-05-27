@@ -58,7 +58,7 @@ def compute_u_sim_h5_diff(h5_file, u_sim, base_path = "Function/displacement"):
             d2 = d2.reshape(d1.shape)
             
             # Calcul de la norme de la différence
-            diff = np.linalg.norm(d1 - d2)
+            diff = np.linalg.norm(d1 - d2)**2
             errors.append(diff)
             
             print(f"Pas {step} : Différence = {diff}")
@@ -177,6 +177,57 @@ def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0
     error = compute_u_sim_raw_h5_diff(f, u_sim)
     return error
 
+
+def compute_J2_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]): 
+    """
+    Compute the total displacement difference between 
+    H5 reference raw file extracted with h5py
+    and simulation output array for a given set of Hill48 parameters.
+
+    params should be a list or array containing the following parameters in order:
+    (E, nu, sigma_Y, Q_var, k_hardening)
+    
+    """
+    hill_params = dict(
+    t_start     = 0.0,
+    T           = 3.0,
+    num_steps   = 2,
+    load_amp    = 0.01,       # amplitude of the applied displacement
+    length      = 10.0,       # half-length of the specimen
+    mesh_file   = "Flat_specimen_refined.msh",
+    output_dir  = "results_plasticity",
+    file_name    = "donnes_ref",
+    # Elastic constants (used when no model is supplied)
+    E           = params[0],
+    nu          = params[1],
+    # J2 isotropic hardening parameters (used when no model is supplied)
+    sigma_Y     = params[2],
+    Q_var       = params[3],
+    k_hardening = params[4],
+    )
+
+    # if not is_hill48_physically_valid(params):
+    #     print("--> [REJET PRÉ-FEM] Paramètres non physiques ou Hill48 non convexe.")
+    #     raise ValueError("Hill48 non convexe ou paramètres non physiques")
+
+    model = J2IsotropicHardening(
+        elastic=ElasticModel(hill_params["E"], hill_params["nu"], tdim=3),
+        sigma_Y=hill_params["sigma_Y"],
+        Q_var=hill_params["Q_var"],
+        k=hill_params["k_hardening"]
+    )
+
+    try:
+        # On tente de lancer la simulation dolfinx
+        _, u_sim = run_simulation_V2(hill_params, model=model, write_output=False)
+        error = compute_u_sim_raw_h5_diff(f, u_sim)
+    except RuntimeError as e:
+        # Si le solveur de Newton échoue, on ne crash pas !
+        print(f"--> [Newton Divergence] Paramètres instables détectés. Pénalisation de l'erreur.")
+        # On renvoie une erreur artificiellement grande pour dire à SciPy de rebrousser chemin
+        error = 1e3
+    return error
+
 # with h5py.File("femu_files/res.h5", 'r') as f:
 #     diffs = compute_hill_raw_h5_error_from_parameters(f)
 #     print(f"Différence totale : {diffs}")
@@ -194,6 +245,14 @@ bounds_ref = [
     (0.8, 1.8),           # L : cisaillement hors-plan, resserré
     (0.8, 1.8),           # M : cisaillement hors-plan, resserré
     (0.6, 1.6),           # N : cisaillement plan, cohérent avec H et resserré
+]
+
+bounds_ref_J2 = [
+    (150_000, 250_000),   # E [MPa]
+    (0.25, 0.35),         # nu 
+    (10.0, 500.0),        # sigma_Y [MPa]
+    (20.0, 400.0),         # Q_var [MPa]
+    (10.0, 1500.0),          # k_hardening
 ]
 
 
@@ -272,88 +331,7 @@ def femu_V2(
             params0,
             method='L-BFGS-B',
             bounds=bounds_ref,
-            options={'ftol': 1e-5, 'maxiter': 150, 'disp': True, 'eps': 1e-3}
-        )
-        
-    plt.ioff()
-    plt.show()
-    return result
-
-
-
-
-def femu_V3(
-        h5_file,
-        params0=[200_002, 0.29, 102, 52, 8, 0.52, 0.52, 0.48, 1.52, 1.48, 1.45],
-        bounds = bounds_ref
-    ):
-
-    dimensions = [
-        Real(bounds_ref[i][0], bounds_ref[i][1], name=f"p_{i}") 
-        for i in range(len(bounds_ref))
-    ]
-
-    # --- Configuration du Plot ---
-    plt.ion()
-    fig = plt.figure(figsize=(16, 10))
-    
-    # 11 paramètres + 1 erreur = 12 slots (3 lignes x 4 colonnes)
-    gs = fig.add_gridspec(3, 4)
-    ax_err = fig.add_subplot(gs[0, 0]) # Erreur en haut à gauche
-    
-    # On crée les axes pour les 11 paramètres
-    ax_params = []
-    for i in range(1, 12):
-        row, col = divmod(i, 4)
-        ax_params.append(fig.add_subplot(gs[row, col]))
-    
-    history_err = []
-    history_params = []
-
-    with h5py.File(h5_file, 'r') as f:
-        def objective_function(params):
-
-            print(f"Current params: {params}")
-            error = compute_hill_raw_h5_error_from_parameters(f, params)
-            
-            history_err.append(error)
-            history_params.append(params)
-            data_p = np.array(history_params)
-            
-            # Mise à jour graphique
-            try:
-                # Plot Erreur
-                ax_err.clear()
-                ax_err.plot(history_err, color='firebrick', lw=1.5)
-                ax_err.set_yscale('log')
-                ax_err.set_title("Erreur (Log)")
-                ax_err.grid(True, which="both", ls="-", alpha=0.2)
-
-                # Plot Paramètres
-                for i in range(len(params)):
-                    ax_params[i].clear()
-                    ax_params[i].plot(data_p[:, i], color='royalblue')
-                    ax_params[i].set_title(f"P{i}: {params[i]:.2e}", fontsize=9)
-                    ax_params[i].grid(True, alpha=0.2)
-                
-                plt.tight_layout()
-                plt.pause(0.001)
-            except:
-                # Permet de continuer si la fenêtre est fermée
-                pass
-                
-            print(f"Error: {error}")
-            return error
-
-        result = gp_minimize(
-            objective_function,          # La fonction à minimiser
-            dimensions,                  # L'espace des paramètres (les bornes)
-            n_calls=50,                  # Nombre TOTAL d'évaluations (simulations) max
-            n_random_starts=10,          # Nombre de points initiaux aléatoires (pour démarrer le modèle)
-            acq_func="EI",               # Fonction d'acquisition : Expected Improvement
-            x0=params0,                  # On peut optionnellement lui donner votre point initial
-            random_state=42,             # Pour la reproductibilité
-            verbose=True
+            options={'ftol': 1e-8, 'maxiter': 150, 'disp': True, 'eps': 1e-3}
         )
         
     plt.ioff()
@@ -371,69 +349,50 @@ def denormalize_params(params_norm, bounds):
     return [params_norm[i] * (bounds[i][1] - bounds[i][0]) + bounds[i][0] for i in range(len(bounds))]  
 
 
-def femu_V4(
-        h5_file,
-        params0=[200_002.0, 0.29, 102.0, 52.0, 8.0, 0.52, 0.52, 0.48, 1.52, 1.48, 1.45],
-        bounds=bounds_ref
-    ):
 
-    # - Normalisation des paramètres pour une meilleure convergence -
-    bounds_norm = [(0.0, 1.0) for _ in bounds]
-    
-    params0_norm = normalize_params(params0, bounds)
-    
-    dimensions = [
-        Real(bounds_norm[i][0], bounds_norm[i][1], name=f"p_{i}") 
-        for i in range(len(bounds_norm))
-    ]
-
+def femu_V3(
+    h5_file,
+    params0=[200_500.0, 0.29, 102.0, 52.0, 1_010.0],
+    bounds=bounds_ref
+):
     # --- Configuration du Plot ---
     plt.ion()
     fig = plt.figure(figsize=(16, 10))
-    gs = fig.add_gridspec(3, 4)
-    ax_err = fig.add_subplot(gs[0, 0])
     
+    # 11 paramètres + 1 erreur = 12 slots (3 lignes x 4 colonnes)
+    gs = fig.add_gridspec(3, 4)
+    ax_err = fig.add_subplot(gs[0, 0]) # Erreur en haut à gauche
+    
+    # On crée les axes pour les 11 paramètres
     ax_params = []
-    for i in range(1, 12):
+    for i in range(1, 6):
         row, col = divmod(i, 4)
         ax_params.append(fig.add_subplot(gs[row, col]))
     
     history_err = []
-    history_params = []
+    history_params = [] # On va stocker les paramètres PHYSIQUES (dénormalisés) pour le plot
+
+    # --- Préparation de la Normalisation pour SciPy ---
+    # L-BFGS-B va travailler entre 0 et 1 pour chaque paramètre
+    params0_norm = normalize_params(params0, bounds)
+    bounds_norm = [(0.0, 1.0) for _ in range(len(bounds))]
 
     with h5py.File(h5_file, 'r') as f:
-        
-        # Recommandé pour s'assurer du format des données envoyées par skopt
-        @use_named_args(dimensions)
-        def objective_function(**kwargs):
-            # Extraction propre des variables de la dimension skopt
-            params_norm = [kwargs[f"p_{i}"] for i in range(len(bounds))]
-            # Dénormalisation pour obtenir les paramètres dans leur échelle réelle
-            params = denormalize_params(params_norm, bounds)
-
-            print(f"\nCurrent params: {[round(p, 2) for p in params]}")
+        def objective_function(params_norm):
+            # 1. Dénormalisation pour retrouver les valeurs physiques
+            params_phys = denormalize_params(params_norm, bounds)
             
-            # --- STRATÉGIE DE PÉNALISATION (Try / Except) ---
-            try:
-                error = compute_hill_raw_h5_error_from_parameters(f, params)
-                print(f"Error: {error}")
+            print(f"Current params (phys): {params_phys}")
             
-            except RuntimeError as e:
-                # Intercepte spécifiquement l'échec du solveur de Newton (PETSc / dolfinx)
-                print(f"--> [DIVERGENCE FEniCSx] Le solveur de Newton n'a pas convergé.")
-                print(f"--> Attribution d'une pénalité de 500.0")
-                return 500.0  # Renvoyer une valeur élevée pour forcer skopt à fuir cette zone
+            # 2. Calcul de l'erreur avec les valeurs physiques
+            error = compute_J2_raw_h5_error_from_parameters(f, params_phys)
             
-            except Exception as e:
-                # Intercepte d'autres exceptions numériques potentielles
-                print(f"--> [ERREUR INATTENDUE] : {e}")
-                return 500.0
-
-            # --- Enregistrement de l'historique et tracé si la simulation réussit ---
+            # 3. Stockage pour l'historique
             history_err.append(error)
-            history_params.append(params)
+            history_params.append(params_phys)
             data_p = np.array(history_params)
             
+            # 4. Mise à jour graphique (avec les valeurs physiques)
             try:
                 # Plot Erreur
                 ax_err.clear()
@@ -442,328 +401,52 @@ def femu_V4(
                 ax_err.set_title("Erreur (Log)")
                 ax_err.grid(True, which="both", ls="-", alpha=0.2)
 
-                # Plot Paramètres
-                for i in range(len(params)):
+                # Plot Paramètres (Physiques)
+                for i in range(len(params_phys)):
                     ax_params[i].clear()
                     ax_params[i].plot(data_p[:, i], color='royalblue')
-                    ax_params[i].set_title(f"P{i}: {params[i]:.2e}", fontsize=9)
+                    ax_params[i].set_title(f"P{i}: {params_phys[i]:.2e}", fontsize=9)
                     ax_params[i].grid(True, alpha=0.2)
                 
                 plt.tight_layout()
                 plt.pause(0.001)
             except:
+                # Permet de continuer si la fenêtre est fermée
                 pass
                 
+            print(f"Error: {error}")
             return error
 
-        # result = gp_minimize(
-        #     objective_function,          
-        #     dimensions,                  
-        #     n_calls=50,                  
-        #     n_random_starts=10,          
-        #     acq_func="EI",               
-        #     x0=params0_norm,                  
-        #     random_state=42,             
-        #     verbose=True
-        # )
-        result = gp_minimize(
-            objective_function,          
-            dimensions,                  
-            n_calls=80,                  # Augmenté pour laisser l'algorithme exploiter après l'initialisation
-            n_random_starts=25,          # Recommandé pour 11 variables (environ 2d)
-            initial_point_generator="lhs", # <-- CRITIQUE : Force un échantillonnage spatial optimal (Hypercube Latin)
-            acq_func="EI",               
-            x0=params0_norm,                  
-            random_state=42,             
-            verbose=True
+        # L'optimiseur reçoit les versions normalisées (0 à 1)
+        result_norm = minimize(
+            objective_function,
+            params0_norm,
+            method='L-BFGS-B',
+            bounds=bounds_norm,
+            options={'ftol': 1e-5, 'gtol': 1e-4, 'maxiter': 150, 'disp': True, 'eps': 1e-3}
         )
-
-
-    plt.ioff()
-    plt.show()
-    return denormalize_params(result.x, bounds)
-
-
-from skopt import Optimizer  # <-- Nouvel import requis à la place de gp_minimize
-
-def femu_V5(
-        h5_file,
-        params0=[200_002.0, 0.29, 102.0, 52.0, 8.0, 0.52, 0.52, 0.48, 1.52, 1.48, 1.45],
-        bounds=bounds_ref
-    ):
-    """
-    pour garantir que gp_minimize dispose d'un jeu complet de N simulations réussies 
-    pour entraîner correctement son processus gaussien, plutôt que de polluer son historique avec des pénalités à 500.0.
-    Pour obtenir ce comportement sans perturber le fonctionnement interne de scikit-optimize, 
-    la meilleure méthode consiste à ne pas utiliser directement la boucle automatique de gp_minimize, 
-    mais à utiliser la classe Optimizer de skopt. 
-    Elle permet de piloter l'optimisation manuellement avec une boucle while selon le schéma "Demander un point -> Évaluer -> 
-    Communiquer le résultat" (Ask and Tell).
-    De cette manière, si une simulation échoue, on ignore simplement le point (ou on n'incrémente pas le compteur) 
-    et on redemande un autre point à l'optimiseur.
-
-    """
-
-    dimensions = [
-        Real(bounds[i][0], bounds[i][1], name=f"p_{i}") 
-        for i in range(len(bounds))
-    ]
-
-    # --- Configuration du Plot ---
-    plt.ion()
-    fig = plt.figure(figsize=(16, 10))
-    gs = fig.add_gridspec(3, 4)
-    ax_err = fig.add_subplot(gs[0, 0])
-    
-    ax_params = []
-    for i in range(1, 12):
-        row, col = divmod(i, 4)
-        ax_params.append(fig.add_subplot(gs[row, col]))
-    
-    history_err = []
-    history_params = []
-
-    # 1. Initialisation explicite de l'optimiseur skopt
-    opt = Optimizer(
-        dimensions=dimensions,
-        n_random_starts=25,            # Vos itérations initiales LHS
-        initial_point_generator="lhs",
-        acq_func="EI",
-        random_state=42
-    )
-
-    # Paramétrage de vos objectifs de convergence
-    n_successful_calls_target = 60    # On veut par exemple 60 VRAIES simulations réussies au total
-    successful_calls = 0
-    iteration_total = 0
-
-    with h5py.File(h5_file, 'r') as f:
         
-        # On injecte manuellement le point initial params0 au premier coup s'il est valide
-        if params0 is not None:
-            next_x = params0
-            params0 = None # Pour ne le faire qu'une seule fois
-        else:
-            next_x = opt.ask()
-
-        # Boucle tant que le quota de simulations réussies n'est pas atteint
-        while successful_calls < n_successful_calls_target:
-            iteration_total += 1
-            print(f"\n--- Itération globale n°{iteration_total} (Succès cumulés: {successful_calls}/{n_successful_calls_target}) ---")
-            print(f"Paramètres testés : {[round(p, 2) for p in next_x]}")
-            
-            try:
-                # 2. Exécution de FEniCSx
-                error = compute_hill_raw_h5_error_from_parameters(f, next_x)
-                print(f"-> Succès ! Error calculée : {error}")
-                
-                # Envoi du résultat valide à l'optimiseur
-                opt.tell(next_x, error)
-                
-                # Mise à jour des compteurs et historique graphique
-                successful_calls += 1
-                history_err.append(error)
-                history_params.append(next_x)
-                
-                # Génération du point suivant pour l'itération d'après
-                if successful_calls < n_successful_calls_target:
-                    next_x = opt.ask()
-                
-                # Rafraîchissement des graphiques
-                try:
-                    data_p = np.array(history_params)
-                    ax_err.clear()
-                    ax_err.plot(history_err, color='firebrick', lw=1.5)
-                    ax_err.set_yscale('log')
-                    ax_err.set_title("Erreur (Log)")
-                    ax_err.grid(True, which="both", ls="-", alpha=0.2)
-
-                    for i in range(len(next_x)):
-                        ax_params[i].clear()
-                        ax_params[i].plot(data_p[:, i], color='royalblue')
-                        ax_params[i].set_title(f"P{i}: {next_x[i]:.2e}", fontsize=9)
-                        ax_params[i].grid(True, alpha=0.2)
-                    
-                    plt.tight_layout()
-                    plt.pause(0.001)
-                except:
-                    pass
-
-            except RuntimeError as e:
-                # 3. GESTION DE LA DIVERGENCE (Newton max iterations, etc.)
-                print(f"--> [DIVERGENCE FEniCSx] Le solveur n'a pas convergé.")
-                print(f"--> Rejet de ce set. Demande d'un nouveau point sans incrémenter le compteur de succès.")
-                
-                # STRATÉGIE : On assigne une très mauvaise valeur (pénalité) à ce point précis 
-                # pour que l'optimiseur apprenne instantanément que c'est une zone interdite...
-                opt.tell(next_x, 500.0)
-                
-                # ...MAIS on ne compte pas cette itération comme un succès et on redemande immédiatement un point !
-                next_x = opt.ask()
-                
-            except Exception as e:
-                print(f"--> [ERREUR INATTENDUE] : {e}")
-                opt.tell(next_x, 500.0)
-                next_x = opt.ask()
-
     plt.ioff()
     plt.show()
     
-    # Récupération du meilleur résultat final à partir de l'objet Optimizer
-    best_index = np.argmin(opt.yi)
-    print("\n--- OPTIMISATION TERMINÉE ---")
-    print(f"Nombre total d'essais (Valides + Échecs) : {iteration_total}")
-    print(f"Nombre de simulations réussies enregistrées : {successful_calls}")
-    print("Meilleurs paramètres trouvés :", opt.Xi[best_index])
-    print("Plus petite erreur obtenue :", opt.yi[best_index])
+    # --- Post-traitement ---
+    # On reconstruit l'objet résultat pour renvoyer les paramètres physiques optimaux
+    result_phys = result_norm
+    result_phys.x = np.array(denormalize_params(result_norm.x, bounds))
     
-    return opt
-
-
-from skopt.sampler import Lhs
-
-
-
-
-def femu(
-        h5_file,
-        params0=[200_500.0, 0.29, 105.0, 52.0, 8.0, 0.52, 0.52, 0.48, 1.52, 1.48, 1.45],
-        bounds=bounds_ref,
-        n_lhs_target = 35,                
-        n_successful_calls_target = 70,
-    ):
-    """
-    Par défaut, si l'échantillonnage par Hypercube Latin (LHS) génère 25 points et que 5 d'entre eux font planter FEniCSx, 
-    gp_minimize considère que sa phase d'apprentissage est terminée au bout de 25 itérations, 
-    même s'il n'a que 20 vraies simulations réussies en mémoire. Le modèle de substitution démarre 
-    alors sa phase d'exploitation avec un sérieux déficit d'apprentissage.
-    Pour garantir que vous obtenez exactement 25 points initiaux LHS réussis, il faut légèrement adapter la boucle Ask & Tell.
-    scikit-optimize ne permet pas de régénérer un point LHS à la demande à l'intérieur de l'objet Optimizer.
-    L'astuce consiste à générer l'intégralité de vos points LHS à l'avance, puis à piocher dedans et à en recréer de nouveaux
-    si certains échouent.
-    """
-    dimensions = [
-        Real(bounds[i][0], bounds[i][1], name=f"p_{i}") 
-        for i in range(len(bounds))
-    ]
-
-    # --- Configuration du Plot ---
-    plt.ion()
-    fig = plt.figure(figsize=(16, 10))
-    gs = fig.add_gridspec(3, 4)
-    ax_err = fig.add_subplot(gs[0, 0])
-    ax_params = [fig.add_subplot(gs[divmod(i, 4)[0], divmod(i, 4)[1]]) for i in range(1, 12)]
-    
-    history_err = []
-    history_params = []
-
-    opt = Optimizer(
-        dimensions=dimensions,
-        n_random_starts=0,  
-        acq_func="EI",
-        random_state=42
-    )
-    
-    successful_calls = 0
-    iteration_total = 0
-
-    # Génération manuelle initiale
-    lhs_sampler = Lhs(criterion="maximin")
-    lhs_pool = lhs_sampler.generate(dimensions, n_samples=50, random_state=42)
-
-    # Fonction interne sécurisée pour récupérer le prochain point LHS
-    def get_next_lhs_point():
-        nonlocal lhs_pool
-        if len(lhs_pool) == 0:
-            print("--> [INFO] Réserve LHS vide ! Génération de 50 nouveaux points...")
-            # On change le random_state à chaque génération pour ne pas reproduire les mêmes points
-            lhs_pool = lhs_sampler.generate(dimensions, n_samples=50, random_state=iteration_total + 42)
-        return lhs_pool.pop(0) # Extrait et renvoie le premier élément de la liste
-
-    with h5py.File(h5_file, 'r') as f:
-        
-        # Choix du premier point
-        if params0 is not None:
-            next_x = params0
-            params0 = None
-        else:
-            next_x = get_next_lhs_point()
-
-        while successful_calls < n_successful_calls_target:
-            iteration_total += 1
-            
-            if successful_calls < n_lhs_target:
-                phase_str = f"Phase APPRENTISSAGE LHS (Succès: {successful_calls}/{n_lhs_target})"
-            else:
-                phase_str = f"Phase EXPLOITATION BAYÉSIENNE (Succès: {successful_calls}/{n_successful_calls_target})"
-                
-            print(f"\n--- Itération globale n°{iteration_total} | {phase_str} ---")
-            print(f"Paramètres testés : {[round(p, 2) for p in next_x]}")
-
-            try:
-                # Exécution du calcul
-                error = compute_hill_raw_h5_error_from_parameters(f, next_x)
-                print(f"-> Succès ! Error calculée : {error}")
-                
-                opt.tell(next_x, error)
-                
-                successful_calls += 1
-                history_err.append(error)
-                history_params.append(next_x)
-                
-                if successful_calls < n_successful_calls_target:
-                    if successful_calls < n_lhs_target:
-                        next_x = get_next_lhs_point()
-                    else:
-                        next_x = opt.ask()
-                
-                # Plotting
-                try:
-                    data_p = np.array(history_params)
-                    ax_err.clear()
-                    ax_err.plot(history_err, color='firebrick', lw=1.5)
-                    ax_err.set_yscale('log')
-                    ax_err.set_title("Erreur (Log)")
-
-                    for i in range(len(next_x)):
-                        ax_params[i].clear()
-                        ax_params[i].plot(data_p[:, i], color='royalblue')
-                        ax_params[i].set_title(f"P{i}: {next_x[i]:.2e}", fontsize=9)
-                        ax_params[i].grid(True, alpha=0.2)
-                    plt.tight_layout()
-                    plt.pause(0.001)
-                except:
-                    pass
-
-            except (RuntimeError, Exception, ValueError) as e:
-                # Intercepte TOUS les rejets (FEniCSx ou pré-filtrage mécanique)
-                print(f"--> [REJET / CRASH] : {e}")
-                print(f"--> Point écarté. Le compteur de succès n'augmente pas.")
-                
-                # On pénalise l'optimiseur
-                opt.tell(next_x, 500.0)
-                
-                if successful_calls < n_lhs_target:
-                    next_x = get_next_lhs_point()
-                else:
-                    next_x = opt.ask()
-
-    plt.ioff()
-    plt.show()
-    
-    best_index = np.argmin(opt.yi)
-    print("\n--- OPTIMISATION TERMINÉE ---")
-    print(f"Nombre total d'essais (Valides + Échecs) : {iteration_total}")
-    print("Meilleurs paramètres trouvés :", opt.Xi[best_index])
-    print("Plus petite erreur obtenue :", opt.yi[best_index])
-    
-    return opt
-
+    return result_phys
 
 
 if __name__ == "__main__":
-    optimizer_result = femu_V5("femu_files/res.h5", None, bounds_ref)
+    from random import uniform,seed
+    seed(42)  # Pour la reproductibilité
+    perturbation_percentage = 0.01  # 1% de perturbation aléatoire
+    normalized_result = normalize_params([200_500.0, 0.29, 102.0, 52.0, 1_010.0], bounds_ref_J2)
+    normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
+    parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2)
+    optimizer_result = femu_V3("femu_files/res.h5", parameters_disturbed, bounds_ref_J2)
+    print("Optimized parameters (phys):", optimizer_result.x)
 
 
 # if __name__ == "__main__":
-#     optimizer_result = femu("femu_files/res.h5", None, bounds_ref, 35, 70)
+#     optimizer_result = femu("femu_files/res.h5", None, bounds_ref, 35, 70)        

@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
+<Xdmf Version="3.0" xmlns:xi="https://www.w3.org/2001/XInclude">
+  <Domain>
+    <Grid Name="Grid" GridType="Uniform">
+      <Topology TopologyType="Triangle" NumberOfElements="25702" NodesPerElement="3">
+        <DataItem Dimensions="25702 3" NumberType="Int" Format="HDF">dic_results.h5:/Mesh/Grid/topology</DataItem>
+      </Topology>
+      <Geometry GeometryType="XYZ">
+        <DataItem Dimensions="13079 3" Format="HDF">dic_results.h5:/Mesh/Grid/geometry</DataItem>
+      </Geometry>
+    </Grid>
+    <Grid Name="displacement_femu" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="displacement_femu" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="0" />
+        <Attribute Name="displacement_femu" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13079 3" Format="HDF">dic_results.h5:/Function/displacement_femu/0</DataItem>
+        </Attribute>
+      </Grid>
+    </Grid>
+    <Grid Name="strain_tensor" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="strain_tensor" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="0" />
+        <Attribute Name="strain_tensor" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13079 9" Format="HDF">dic_results.h5:/Function/strain_tensor/0</DataItem>
+        </Attribute>
+      </Grid>
+    </Grid>
+  </Domain>
+</Xdmf>

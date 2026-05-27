@@ -1,0 +1,4 @@
+*.h5
+*.xdmf
+dic/results_plasticity/res.h5
+dic/dic_series_complete.h5

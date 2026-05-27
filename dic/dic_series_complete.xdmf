@@ -1,0 +1,2630 @@
+<?xml version="1.0"?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>
+<Xdmf Version="3.0" xmlns:xi="https://www.w3.org/2001/XInclude">
+  <Domain>
+    <Grid Name="Grid" GridType="Uniform">
+      <Topology TopologyType="Triangle" NumberOfElements="25724" NodesPerElement="3">
+        <DataItem Dimensions="25724 3" NumberType="Int" Format="HDF">dic_series_complete.h5:/Mesh/Grid/topology</DataItem>
+      </Topology>
+      <Geometry GeometryType="XYZ">
+        <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Mesh/Grid/geometry</DataItem>
+      </Geometry>
+    </Grid>
+    <Grid Name="displacement" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="0" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/0</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="20" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/20</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="40" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/40</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="60" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/60</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="80" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/80</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="100" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="120" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="140" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="160" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="180" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="200" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="220" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/220</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="240" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="260" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/260</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="280" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/280</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="300" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/300</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="320" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="340" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/340</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="360" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/360</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="380" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/380</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="400" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="420" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/420</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="440" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/440</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="460" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/460</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="480" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="500" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/500</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="520" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="540" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/540</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="560" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/560</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="580" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/580</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="600" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="620" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/620</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="640" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/640</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="660" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/660</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="680" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="700" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/700</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="720" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/720</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="740" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/740</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="760" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="780" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/780</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="800" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/800</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="820" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/820</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="840" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="860" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/860</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="880" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/880</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="900" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/900</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="920" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="940" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/940</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="960" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/960</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="980" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/980</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1000" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1020" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1020</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1040" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1040</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1060" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1060</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1080" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1100" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1120" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1140" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1160" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1180" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1200" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="displacement" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1220" />
+        <Attribute Name="displacement" AttributeType="Vector" Center="Node">
+          <DataItem Dimensions="13090 3" Format="HDF">dic_series_complete.h5:/Function/displacement/1220</DataItem>
+        </Attribute>
+      </Grid>
+    </Grid>
+    <Grid Name="epsilon_ufl" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="0" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/0</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="20" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/20</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="40" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/40</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="60" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/60</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="80" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/80</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="100" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="120" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="140" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="160" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="180" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="200" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="220" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/220</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="240" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="260" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/260</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="280" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/280</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="300" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/300</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="320" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="340" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/340</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="360" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/360</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="380" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/380</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="400" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="420" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/420</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="440" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/440</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="460" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/460</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="480" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="500" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/500</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="520" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="540" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/540</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="560" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/560</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="580" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/580</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="600" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="620" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/620</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="640" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/640</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="660" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/660</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="680" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="700" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/700</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="720" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/720</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="740" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/740</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="760" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="780" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/780</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="800" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/800</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="820" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/820</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="840" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="860" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/860</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="880" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/880</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="900" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/900</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="920" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="940" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/940</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="960" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/960</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="980" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/980</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1000" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1020" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1020</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1040" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1040</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1060" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1060</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1080" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1100" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1120" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1140" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1160" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1180" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1200" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="epsilon_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1220" />
+        <Attribute Name="epsilon_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/epsilon_ufl/1220</DataItem>
+        </Attribute>
+      </Grid>
+    </Grid>
+    <Grid Name="E_ufl" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="0" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/0</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="20" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/20</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="40" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/40</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="60" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/60</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="80" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/80</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="100" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="120" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="140" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="160" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="180" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="200" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="220" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/220</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="240" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="260" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/260</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="280" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/280</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="300" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/300</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="320" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="340" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/340</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="360" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/360</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="380" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/380</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="400" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="420" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/420</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="440" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/440</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="460" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/460</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="480" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="500" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/500</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="520" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="540" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/540</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="560" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/560</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="580" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/580</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="600" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="620" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/620</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="640" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/640</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="660" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/660</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="680" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="700" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/700</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="720" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/720</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="740" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/740</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="760" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="780" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/780</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="800" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/800</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="820" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/820</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="840" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="860" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/860</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="880" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/880</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="900" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/900</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="920" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="940" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/940</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="960" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/960</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="980" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/980</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1000" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1020" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1020</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1040" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1040</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1060" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1060</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1080" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1100" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1120" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1140" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1160" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1180" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1200" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1220" />
+        <Attribute Name="E_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_ufl/1220</DataItem>
+        </Attribute>
+      </Grid>
+    </Grid>
+    <Grid Name="E_csv" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="0" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/0</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="20" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/20</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="40" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/40</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="60" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/60</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="80" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/80</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="100" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="120" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="140" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="160" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="180" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="200" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="220" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/220</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="240" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="260" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/260</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="280" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/280</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="300" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/300</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="320" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="340" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/340</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="360" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/360</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="380" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/380</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="400" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="420" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/420</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="440" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/440</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="460" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/460</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="480" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="500" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/500</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="520" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="540" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/540</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="560" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/560</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="580" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/580</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="600" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="620" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/620</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="640" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/640</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="660" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/660</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="680" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="700" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/700</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="720" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/720</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="740" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/740</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="760" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="780" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/780</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="800" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/800</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="820" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/820</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="840" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="860" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/860</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="880" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/880</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="900" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/900</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="920" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="940" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/940</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="960" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/960</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="980" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/980</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1000" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1020" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1020</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1040" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1040</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1060" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1060</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1080" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1100" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1120" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1140" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1160" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1180" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1200" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="E_csv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1220" />
+        <Attribute Name="E_csv" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/E_csv/1220</DataItem>
+        </Attribute>
+      </Grid>
+    </Grid>
+    <Grid Name="Hencky_ufl" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="0" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/0</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="20" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/20</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="40" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/40</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="60" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/60</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="80" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/80</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="100" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="120" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="140" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="160" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="180" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="200" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="220" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/220</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="240" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="260" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/260</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="280" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/280</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="300" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/300</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="320" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="340" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/340</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="360" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/360</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="380" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/380</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="400" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="420" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/420</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="440" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/440</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="460" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/460</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="480" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="500" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/500</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="520" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="540" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/540</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="560" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/560</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="580" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/580</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="600" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="620" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/620</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="640" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/640</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="660" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/660</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="680" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="700" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/700</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="720" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/720</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="740" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/740</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="760" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="780" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/780</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="800" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/800</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="820" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/820</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="840" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="860" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/860</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="880" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/880</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="900" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/900</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="920" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="940" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/940</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="960" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/960</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="980" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/980</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1000" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1020" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1020</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1040" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1040</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1060" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1060</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1080" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1100" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1120" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1140" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1160" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1180" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1200" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="Hencky_ufl" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1220" />
+        <Attribute Name="Hencky_ufl" AttributeType="Tensor" Center="Node">
+          <DataItem Dimensions="13090 9" Format="HDF">dic_series_complete.h5:/Function/Hencky_ufl/1220</DataItem>
+        </Attribute>
+      </Grid>
+    </Grid>
+    <Grid Name="diff_Hencky_minus_Ecsv" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="0" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/0</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="20" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/20</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="40" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/40</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="60" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/60</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="80" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/80</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="100" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="120" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="140" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="160" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="180" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="200" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="220" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/220</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="240" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/240</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="260" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/260</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="280" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/280</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="300" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/300</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="320" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/320</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="340" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/340</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="360" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/360</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="380" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/380</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="400" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/400</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="420" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/420</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="440" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/440</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="460" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/460</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="480" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/480</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="500" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/500</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="520" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/520</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="540" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/540</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="560" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/560</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="580" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/580</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="600" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/600</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="620" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/620</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="640" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/640</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="660" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/660</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="680" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/680</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="700" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/700</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="720" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/720</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="740" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/740</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="760" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/760</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="780" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/780</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="800" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/800</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="820" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/820</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="840" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/840</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="860" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/860</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="880" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/880</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="900" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/900</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="920" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/920</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="940" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/940</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="960" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/960</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="980" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/980</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1000" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1000</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1020" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1020</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1040" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1040</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1060" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1060</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1080" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1080</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1100" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1100</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1120" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1120</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1140" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1140</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1160" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1160</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1180" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1180</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1200" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1200</DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="diff_Hencky_minus_Ecsv" GridType="Uniform">
+        <xi:include xpointer="xpointer(/Xdmf/Domain/Grid[@GridType='Uniform'][1]/*[self::Topology or self::Geometry])" />
+        <Time Value="1220" />
+        <Attribute Name="diff_Hencky_minus_Ecsv" AttributeType="Scalar" Center="Node">
+          <DataItem Dimensions="13090 1" Format="HDF">dic_series_complete.h5:/Function/diff_Hencky_minus_Ecsv/1220</DataItem>
+        </Attribute>
+      </Grid>
+    </Grid>
+  </Domain>
+</Xdmf>
