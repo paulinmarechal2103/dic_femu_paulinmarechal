@@ -178,7 +178,7 @@ def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0
     return error
 
 
-def compute_J2_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]): 
+def compute_J2_raw_h5_error_from_parameters(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]): 
     """
     Compute the total displacement difference between 
     H5 reference raw file extracted with h5py
@@ -191,7 +191,7 @@ def compute_J2_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 
     hill_params = dict(
     t_start     = 0.0,
     T           = 3.0,
-    num_steps   = 2,
+    num_steps   = 50,
     load_amp    = 0.01,       # amplitude of the applied displacement
     length      = 10.0,       # half-length of the specimen
     mesh_file   = "Flat_specimen_refined.msh",
@@ -219,7 +219,7 @@ def compute_J2_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0, 
 
     try:
         # On tente de lancer la simulation dolfinx
-        _, u_sim = run_simulation_V2(hill_params, model=model, write_output=False)
+        _, u_sim = run_simulation_V3(domain, V, W, WT, hill_params, model=model, write_output=False)
         error = compute_u_sim_raw_h5_diff(f, u_sim)
     except RuntimeError as e:
         # Si le solveur de Newton échoue, on ne crash pas !
@@ -349,12 +349,15 @@ def denormalize_params(params_norm, bounds):
     return [params_norm[i] * (bounds[i][1] - bounds[i][0]) + bounds[i][0] for i in range(len(bounds))]  
 
 
+from datetime import datetime
 
 def femu_V3(
-    h5_file,
-    params0=[200_500.0, 0.29, 102.0, 52.0, 1_010.0],
-    bounds=bounds_ref
-):
+        domain,
+        V, W, WT,
+        h5_file,
+        params0=[200_500.0, 0.29, 102.0, 52.0, 1_010.0],
+        bounds=bounds_ref,
+    ):
     # --- Configuration du Plot ---
     plt.ion()
     fig = plt.figure(figsize=(16, 10))
@@ -382,10 +385,10 @@ def femu_V3(
             # 1. Dénormalisation pour retrouver les valeurs physiques
             params_phys = denormalize_params(params_norm, bounds)
             
-            print(f"Current params (phys): {params_phys}")
+            print(f"{str(datetime.now())} \nCurrent params (phys): {params_phys}\n")
             
             # 2. Calcul de l'erreur avec les valeurs physiques
-            error = compute_J2_raw_h5_error_from_parameters(f, params_phys)
+            error = compute_J2_raw_h5_error_from_parameters(domain,V,W,WT,f, params_phys)
             
             # 3. Stockage pour l'historique
             history_err.append(error)
@@ -438,15 +441,16 @@ def femu_V3(
 
 
 if __name__ == "__main__":
+    domain = load_and_write_mesh("Flat_specimen_refined.msh")
+
+    V, W, WT = build_function_spaces(domain)
     from random import uniform,seed
     seed(42)  # Pour la reproductibilité
-    perturbation_percentage = 0.05  # 1% de perturbation aléatoire
-    normalized_result = normalize_params([200_500.0, 0.29, 102.0, 52.0, 1_010.0], bounds_ref_J2)
+    perturbation_percentage = 0.05  # 5% de perturbation aléatoire
+    normalized_result = normalize_params([200_000.0, 0.3, 100.0, 50.0, 1_000.0], bounds_ref_J2)
     normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
     parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2)
-    optimizer_result = femu_V3("femu_files/res.h5", parameters_disturbed, bounds_ref_J2)
+    optimizer_result = femu_V3(domain,V, W, WT,"femu_files/non_refined.h5", parameters_disturbed, bounds_ref_J2)
     print("Optimized parameters (phys):", optimizer_result.x)
 
 
-# if __name__ == "__main__":
-#     optimizer_result = femu("femu_files/res.h5", None, bounds_ref, 35, 70)

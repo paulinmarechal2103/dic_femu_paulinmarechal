@@ -836,12 +836,127 @@ def run_simulation_V2(config=None, model: PlasticityModel = None, write_output: 
     return force_vec, displ_val
 
 
+# domain = load_and_write_mesh("Flat_specimen_refined.msh")
+
+# V, W, WT = build_function_spaces(domain)
+
+
+def run_simulation_V3(domain,V,W,WT,config=None, model: PlasticityModel = None, write_output: bool = True):
+    """
+    Run the elasto-plastic simulation.
+
+    Parameters
+    ----------
+    config : dict            – keys from DEFAULT_CONFIG to override
+    model  : PlasticityModel – plasticity model to use.
+             Defaults to J2IsotropicHardening built from config values.
+    write_output : bool      – if False, skips all XDMF I/O and field projections
+                               for maximum speed during FEMU/optimization loops.
+
+    Returns
+    -------
+    force_vec : list of float – reaction force at the right boundary per step
+    displ_val : list of np.ndarray – displacement vector per step
+    """
+    cfg       = {**DEFAULT_CONFIG, **(config or {})}
+    t         = cfg["t_start"]
+    num_steps = cfg["num_steps"]
+    dt        = (cfg["T"] - t) / num_steps
+    load_amp  = cfg["load_amp"]
+    length    = cfg["length"]
+
+    # ------------------------------------------------------------------ mesh
+
+    # ---------------------------------------------------------- output file
+    fic = None
+
+
+    # -------------------------------------------------------- function spaces
+
+    # ------------------------------------------------------- plasticity model
+    if model is None:
+        elastic = ElasticModel(E=cfg["E"], nu=cfg["nu"], tdim=domain.topology.dim)
+        model   = J2IsotropicHardening(
+            elastic, sigma_Y=cfg["sigma_Y"], Q_var=cfg["Q_var"], k=cfg["k_hardening"]
+        )
+
+    state = model.create_state(domain, W, WT)
+
+    # ---------------------------------------------------------- BCs + solver
+    disp_value          = np.array((load_amp, 0.1 * load_amp, 0), dtype=PETSc.ScalarType)
+    bcs                 = dirichlet_bcs(domain, V, disp_value, length)
+    uh, problem, solver = build_solver(domain, V, model, state, bcs)
+    ds                  = build_right_facet_tag(domain, length)
+
+    # ------------------------------------------------------------ time loop
+    force_vec  = []
+    displ_val  = []
+    t_paraview = 0
+
+    # Silence PETSc/SNES logs for cleaner FEMU output
+    opts = PETSc.Options()
+    opts["ksp_monitor"] = None
+    opts["snes_monitor"] = None
+    log.set_log_level(log.LogLevel.ERROR)
+
+    for step in range(num_steps + 1):
+        t          += dt
+        bcs         = dirichlet_bcs(domain, V, disp_value * t, length)
+        problem.bcs = bcs
+
+        solver.solve(uh)
+
+        # --- Calculs physiques essentiels (toujours exécutés) ---
+        eps                  = model.elastic.epsilon(uh)
+        delta_p, delta_eps_p = model.update(state, eps)
+
+        # Stockage du déplacement
+        current_displ = uh.x.array.copy()
+        displ_val.append(current_displ)
+
+        # Contrainte & Force de réaction
+        stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
+        force  = fem.assemble_scalar(fem.form(stress[0, 0] * ds(1)))
+        force_vec.append(force)
+
+        # --------------------------------------------------------------
+        # Projections & E/S Paraview (uniquement si write_output=True)
+        # --------------------------------------------------------------
+        
+
+        # Advance internal variables to tₙ₊₁
+        model.commit(state, uh)
+
+    if fic is not None:
+        fic.close()
+
+    return force_vec, displ_val
+
+
+
 
 # ===========================================================================
 # Entry point
 # ===========================================================================
 if __name__ == "__main__":
-    forces = run_simulation()
+    config = dict(
+        t_start     = 0.0,
+        T           = 3.0,
+        num_steps   = 50,
+        load_amp    = 0.01,       # amplitude of the applied displacement
+        length      = 10.0,       # half-length of the specimen
+        mesh_file   = "Flat_specimen_refined.msh",
+        output_dir  = "results_plasticity",
+        file_name    = "non_refined",
+        # Elastic constants (used when no model is supplied)
+        E           = 200_000.0,
+        nu          = 0.3,
+        # J2 isotropic hardening parameters (used when no model is supplied)
+        sigma_Y     = 100.0,
+        Q_var       = 50.0,
+        k_hardening = 1000.0,
+    )
+    forces = run_simulation(config=config)
 
     plt.figure()
     plt.plot(forces)

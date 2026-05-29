@@ -30,5 +30,5 @@ w() = BooleanFragments{ Volume{v()} ; Delete; }{ Volume{1}; Delete ;} ;
 
 
 
-Characteristic Length{ PointsOf{ Volume{w()}; } } = 0.2;
-Characteristic Length{ PointsOf{ Volume{v()}; } } = 0.2;
+Characteristic Length{ PointsOf{ Volume{w()}; } } = 0.5;
+Characteristic Length{ PointsOf{ Volume{v()}; } } = 0.5;
