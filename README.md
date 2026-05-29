@@ -1,14 +1,14 @@
 # VIC-2D/3D Digital Image Correlation & Finite Element Model Updating Framework
 
-A Python framework dedicated to VIC-2D/3D Digital Image Correlation (DIC) data exploitation for mechanical parameter identification. The pipeline leverages Finite Element Model Updating (FEMU), combining FEniCSx for PDE solving and Bayesian optimization.
+A Python framework dedicated to VIC-2D/3D Digital Image Correlation (DIC) data exploitation for mechanical parameter identification. The pipeline leverages Finite Element Model Updating (FEMU), using FEniCSx for PDE solving.
 
-> 🚧 **Work In Progress (WIP):** Active development is currently focused exclusively on the `plasticity/` directory. Other modules may be unstable or incomplete.
+> 🚧 **Work In Progress (WIP):** Active development is currently focused exclusively on the `plasticity/` directory.
 
 ---
 
 ## Prerequisites & Installation
 
-> ⚠️ **Platform Note:** This installation setup is explicitly tailored and tested for a Linux environment (some libraries are only working on linux).
+> **Platform Note:** This installation setup is explicitly tailored and tested for a Linux environment.
 
 Due to complex scientific dependencies, it is highly recommended to use Conda (or Mamba if Conda is crashing) to manage your virtual environment.
 
