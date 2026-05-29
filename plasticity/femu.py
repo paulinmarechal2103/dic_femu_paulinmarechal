@@ -440,7 +440,7 @@ def femu_V3(
 if __name__ == "__main__":
     from random import uniform,seed
     seed(42)  # Pour la reproductibilité
-    perturbation_percentage = 0.01  # 1% de perturbation aléatoire
+    perturbation_percentage = 0.05  # 1% de perturbation aléatoire
     normalized_result = normalize_params([200_500.0, 0.29, 102.0, 52.0, 1_010.0], bounds_ref_J2)
     normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
     parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2)
@@ -449,4 +449,4 @@ if __name__ == "__main__":
 
 
 # if __name__ == "__main__":
-#     optimizer_result = femu("femu_files/res.h5", None, bounds_ref, 35, 70)        
+#     optimizer_result = femu("femu_files/res.h5", None, bounds_ref, 35, 70)

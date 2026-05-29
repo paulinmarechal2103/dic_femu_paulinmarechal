@@ -8,7 +8,7 @@ from dolfinx.io import XDMFFile
 from mpi4py import MPI
 
 # Import de vos fonctions du fichier dic_calibration.py
-from projet_dic.dic.dic_calibration_V1 import (
+from projet_dic.dic.dic_calibration_delaunay import (
     calibrate_2d, # On utilise la version non-cached pour garder le contrôle
     check_calibration_2d,
     dolfinx_mesh_to_pv_mesh

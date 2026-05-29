@@ -208,14 +208,16 @@ def plot_hill_surface(params, sigma_y_val=None):
     plt.axvline(0, color='black', lw=1)
     plt.xlabel(r'$\sigma_{11}$ (MPa)')
     plt.ylabel(r'$\sigma_{22}$ (MPa)')
-    plt.title(f"Surface de charge : Hill48 (Rouge) vs Von Mises (Bleu)")
+    plt.title(f"Surface de charge : Hill48 (Rouge) vs Von Mises (Bleu)" +f"\n(F={F}, G={G}, H={H})" )
     plt.legend(['Hill48', 'Von Mises'], loc='upper right')
     plt.axis('equal')
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.show()
 
 # Utilisation :
-# plot_hill_surface(hill_params)
+
+if __name__ == "__main__":
+    plot_hill_surface(hill_params)
 
 
 # forces = plasticity_simu.run_simulation(hill_params, modèle_hill48)
