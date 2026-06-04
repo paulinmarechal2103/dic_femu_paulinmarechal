@@ -55,8 +55,8 @@ def csv_to_fenicsx_xdmf(csv_file: str, xdmf_path: str, alpha: float = 0.2) -> No
         points=points,
         cells=[("triangle", triangles)],
         point_data={
-            "x": x_values_2d, # Position X initiale de la DIC rattachée au point
-            "y": y_values_2d, # Position Y initiale de la DIC rattachée au point
+            "x_c": x_values_2d, # Position X initiale de la DIC rattachée au point
+            "y_c": y_values_2d, # Position Y initiale de la DIC rattachée au point
             "u": u_values_2d,
             "v": v_values_2d,
         }
@@ -209,11 +209,11 @@ def create_reference_mesh_from_csv(csv_file: str, alpha: float = 20.0):
     # Filtrage des points valides au pas 1 (déplacement non nul et non NaN)
     valid_mask = (d["sigma"] != -1)
     
-    ref_x = np.round(d["x"][valid_mask], 4)
-    ref_y = np.round(d["y"][valid_mask], 4)
+    ref_x = np.round(d["x_c"][valid_mask], 4)
+    ref_y = np.round(d["y_c"][valid_mask], 4)
     REFERENCE_COORDS = list(zip(ref_x, ref_y))
     
-    points = np.stack([d["x"][valid_mask], d["y"][valid_mask], np.zeros_like(d["x"][valid_mask])], axis=-1)
+    points = np.stack([d["x_c"][valid_mask], d["y_c"][valid_mask], np.zeros_like(d["x_c"][valid_mask])], axis=-1)
     
     # Triangulation PyVista
     cloud = pv.PolyData(points)
@@ -255,8 +255,8 @@ def update_displacement_field(csv_file: str, mesh_dolfinx, u_obs):
     names = [s.replace('"', "").replace(" ", "") for s in data.columns]
     d = {names[i]: data.values[:, i] for i in range(len(names))}
 
-    current_x = np.round(d["x"], 4)
-    current_y = np.round(d["y"], 4)
+    current_x = np.round(d["x_c"], 4)
+    current_y = np.round(d["y_c"], 4)
     
     current_data_map = {
         (cx, cy): (cu, cv) for cx, cy, cu, cv in zip(current_x, current_y, d["u"], d["v"])
@@ -314,7 +314,7 @@ def update_displacement_field_2(csv_file: str, mesh_dolfinx, u_obs, k: int = 3):
         u_values = np.zeros(len(REFERENCE_COORDS))
         v_values = np.zeros(len(REFERENCE_COORDS))
     else:
-        valid_coords = np.stack([d["x"][valid_mask], d["y"][valid_mask]], axis=-1)
+        valid_coords = np.stack([d["x_c"][valid_mask], d["y_c"][valid_mask]], axis=-1)
         valid_u = u_curr[valid_mask]
         valid_v = v_curr[valid_mask]
 
@@ -391,7 +391,7 @@ def update_strain_field_from_csv(csv_file: str, mesh_dolfinx, E_obs, k: int = 3)
         eyy_values = np.zeros(len(REFERENCE_COORDS))
         exy_values = np.zeros(len(REFERENCE_COORDS))
     else:
-        valid_coords = np.stack([d["x"][valid_mask], d["y"][valid_mask]], axis=-1)
+        valid_coords = np.stack([d["x_c"][valid_mask], d["y_c"][valid_mask]], axis=-1)
         valid_exx = exx_curr[valid_mask]
         valid_eyy = eyy_curr[valid_mask]
         valid_exy = exy_curr[valid_mask]

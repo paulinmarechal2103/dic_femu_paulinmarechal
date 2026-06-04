@@ -321,33 +321,85 @@ def create_mesh(msh, cell_type, prune_z=True):
     return meshio.Mesh(points=points, cells={cell_type: cells})
 
 
-def load_and_write_mesh(mesh_file):
+def create_2D_mesh(msh, cell_type):
     """
-    Read a Gmsh .msh file, write XDMF sub-meshes, return the dolfinx domain.
-
-    Only rank 0 writes; all ranks read.
+    Extract a meshio.Mesh of the given *cell_type* from a raw meshio object.
 
     Parameters
     ----------
-    mesh_file : str – path to the .msh file
+    msh       : meshio.Mesh
+    cell_type : str  – 'tetra', 'triangle', 'line', …
+    prune_z   : bool – drop the z-coordinate (for 2-D meshes)
+    """
+    cells  = msh.get_cells_type(cell_type)
+    points = msh.points[:, :2]
+    return meshio.Mesh(points=points, cells={cell_type: cells})
 
-    Returns
-    -------
-    domain : dolfinx.mesh.Mesh
+# def load_and_write_mesh(mesh_file):
+#     """
+#     Read a Gmsh .msh file, write XDMF sub-meshes, return the dolfinx domain.
+
+#     Only rank 0 writes; all ranks read.
+
+#     Parameters
+#     ----------
+#     mesh_file : str – path to the .msh file
+
+#     Returns
+#     -------
+#     domain : dolfinx.mesh.Mesh
+#     """
+#     if MPI.COMM_WORLD.rank == 0:
+#         msh           = meshio.read(mesh_file)
+#         triangle_mesh = create_mesh(msh, "tetra", prune_z=False)
+#         line_mesh     = create_mesh(msh, "line",  prune_z=True)
+#         meshio.write("mesh.xdmf", triangle_mesh)
+#         meshio.write("mt.xdmf",   line_mesh)
+
+#     with io.XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "r") as xdmf:
+#         domain = xdmf.read_mesh(name="Grid")
+
+#     domain.topology.create_connectivity(domain.topology.dim, domain.topology.dim - 1)
+#     return domain
+
+def load_and_write_mesh(mesh_file):
+    """
+    Read a Gmsh .msh file, detect if it is 2D or 3D, 
+    write appropriate XDMF sub-meshes, and return the dolfinx domain.
     """
     if MPI.COMM_WORLD.rank == 0:
-        msh           = meshio.read(mesh_file)
-        triangle_mesh = create_mesh(msh, "tetra", prune_z=False)
-        line_mesh     = create_mesh(msh, "line",  prune_z=True)
-        meshio.write("mesh.xdmf", triangle_mesh)
-        meshio.write("mt.xdmf",   line_mesh)
+        msh = meshio.read(mesh_file)
+        
+        # 1. Détection automatique de la dimension via les types de cellules présents
+        has_tetra = any(cell.type == "tetra" for cell in msh.cells)
+        has_triangle = any(cell.type == "triangle" for cell in msh.cells)
+        
+        if has_tetra:
+            print(f"[Mesh Loader] Détection d'un maillage 3D ({mesh_file})")
+            # En 3D : le volume = "tetra", la surface (frontières) = "triangle"
+            domain_mesh = create_mesh(msh, "tetra", prune_z=False)
+            boundary_mesh = create_mesh(msh, "line", prune_z=False)
+        elif has_triangle:
+            print(f"[Mesh Loader] Détection d'un maillage 2D ({mesh_file})")
+            # En 2D : la surface = "triangle", les lignes (frontières) = "line"
+            # prune_z=True est crucial ici pour projeter le maillage sur le plan (x, y) dans dolfinx
+            domain_mesh = create_2D_mesh(msh, "triangle")
+            boundary_mesh = create_2D_mesh(msh, "line")
+        else:
+            raise ValueError("Le maillage ne contient ni 'tetra' ni 'triangle'. Format non supporté.")
+
+        # Écriture des fichiers XDMF
+        meshio.write("mesh.xdmf", domain_mesh)
+        meshio.write("mt.xdmf", boundary_mesh)
+
+    # Synchronisation des processus MPI avant la lecture
+    MPI.COMM_WORLD.Barrier()
 
     with io.XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "r") as xdmf:
         domain = xdmf.read_mesh(name="Grid")
 
     domain.topology.create_connectivity(domain.topology.dim, domain.topology.dim - 1)
     return domain
-
 
 # ===========================================================================
 # Function spaces
@@ -407,7 +459,7 @@ def project(v, target_func, bcs=None):
 # ===========================================================================
 # Boundary conditions
 # ===========================================================================
-def build_right_facet_tag(domain, length):
+def build_right_facet_tag(domain, coord=0):
     """
     Mark the right-boundary facets (x ≈ +length) with tag 1.
 
@@ -415,35 +467,87 @@ def build_right_facet_tag(domain, length):
     -------
     ds : ufl.Measure restricted to the right boundary
     """
+    x_coords = domain.geometry.x[:, coord]
+    x_max = np.max(x_coords)
     facets    = locate_entities(domain, domain.topology.dim - 1,
-                                lambda x: x[0] >= (length - 1e-8))
+                                lambda x: x[coord] >= (x_max - 1e-8))
     facet_tag = meshtags(domain, domain.topology.dim - 1,
                          facets, np.full_like(facets, 1))
     return ufl.Measure("ds", domain=domain, subdomain_data=facet_tag)
 
 
+# def dirichlet_bcs(domain, space, disp_value, length):
+#     """
+#     Symmetric tensile BCs: left at –disp_value, right at +disp_value.
+
+#     Parameters
+#     ----------
+#     domain     : dolfinx.mesh.Mesh
+#     space      : vector FunctionSpace V
+#     disp_value : array-like – displacement amplitude (already time-scaled)
+#     length     : float
+#     """
+#     fdim         = domain.topology.dim - 1
+#     left_facets  = mesh.locate_entities_boundary(
+#         domain, fdim, lambda x: x[0] <= (-length + 1e-8))
+#     right_facets = mesh.locate_entities_boundary(
+#         domain, fdim, lambda x: x[0] >= (+length - 1e-8))
+
+#     bc_left  = fem.dirichletbc(fem.Constant(domain, -disp_value),
+#                                fem.locate_dofs_topological(space, fdim, left_facets), space)
+#     bc_right = fem.dirichletbc(fem.Constant(domain,  disp_value),
+#                                fem.locate_dofs_topological(space, fdim, right_facets), space)
+#     return [bc_left, bc_right]
+
 def dirichlet_bcs(domain, space, disp_value, length):
     """
-    Symmetric tensile BCs: left at –disp_value, right at +disp_value.
-
-    Parameters
-    ----------
-    domain     : dolfinx.mesh.Mesh
-    space      : vector FunctionSpace V
-    disp_value : array-like – displacement amplitude (already time-scaled)
-    length     : float
+    Symmetric tensile BCs: automatically detects left and right boundaries
+    based on the mesh bounding box.
     """
-    fdim         = domain.topology.dim - 1
-    left_facets  = mesh.locate_entities_boundary(
-        domain, fdim, lambda x: x[0] <= (-length + 1e-8))
-    right_facets = mesh.locate_entities_boundary(
-        domain, fdim, lambda x: x[0] >= (+length - 1e-8))
+    fdim = domain.topology.dim - 1
 
+    # 1. Détection automatique des bornes géométriques en X
+    # On extrait les coordonnées de tous les nœuds du maillage
+    x_coords = domain.geometry.x[:, 1]
+    x_min = np.min(x_coords)
+    x_max = np.max(x_coords)
+
+    # 2. Définition des fonctions de localisation avec une tolérance numérique
+    # (indispensable pour éviter les ratés dus aux arrondis machine)
+    tol = 1e-6
+    left_facets  = mesh.locate_entities_boundary(
+        domain, fdim, lambda x: x[1] <= (x_min + tol))
+    right_facets = mesh.locate_entities_boundary(
+        domain, fdim, lambda x: x[1] >= (x_max - tol))
+
+    # 3. Application des conditions aux limites
     bc_left  = fem.dirichletbc(fem.Constant(domain, -disp_value),
                                fem.locate_dofs_topological(space, fdim, left_facets), space)
     bc_right = fem.dirichletbc(fem.Constant(domain,  disp_value),
                                fem.locate_dofs_topological(space, fdim, right_facets), space)
     return [bc_left, bc_right]
+
+def dirichlet_bcs_tensile(domain, space, left_disp_constant, right_disp_constant, coord=0):
+    fdim = domain.topology.dim - 1
+
+    # CORRECTION : Extraire la colonne X de TOUS les nœuds
+    x_coords = domain.geometry.x[:, coord]
+    x_min = np.min(x_coords)
+    x_max = np.max(x_coords)
+
+    tol = 1e-6
+    left_facets  = mesh.locate_entities_boundary(domain, fdim, lambda x: x[coord] <= (x_min + tol))
+    right_facets = mesh.locate_entities_boundary(domain, fdim, lambda x: x[coord] >= (x_max - tol))
+
+    # On applique les bcs directement sur les objets Constant passés en argument
+    bc_left  = fem.dirichletbc(left_disp_constant,
+                               fem.locate_dofs_topological(space, fdim, left_facets), space)
+    bc_right = fem.dirichletbc(right_disp_constant,
+                               fem.locate_dofs_topological(space, fdim, right_facets), space)
+    return [bc_left, bc_right]
+
+
+
 
 
 # ===========================================================================
@@ -841,7 +945,7 @@ def run_simulation_V2(config=None, model: PlasticityModel = None, write_output: 
 # V, W, WT = build_function_spaces(domain)
 
 
-def run_simulation_V3(domain,V,W,WT,config=None, model: PlasticityModel = None, write_output: bool = True):
+def run_simulation_V3(domain,V,W,WT,config=None, coord = 1, model: PlasticityModel = None, write_output: bool = True):
     """
     Run the elasto-plastic simulation.
 
@@ -864,7 +968,7 @@ def run_simulation_V3(domain,V,W,WT,config=None, model: PlasticityModel = None, 
     dt        = (cfg["T"] - t) / num_steps
     load_amp  = cfg["load_amp"]
     length    = cfg["length"]
-
+    ds = build_right_facet_tag(domain, coord)
     # ------------------------------------------------------------------ mesh
 
     # ---------------------------------------------------------- output file
@@ -883,10 +987,21 @@ def run_simulation_V3(domain,V,W,WT,config=None, model: PlasticityModel = None, 
     state = model.create_state(domain, W, WT)
 
     # ---------------------------------------------------------- BCs + solver
-    disp_value          = np.array((load_amp, 0.1 * load_amp, 0), dtype=PETSc.ScalarType)
-    bcs                 = dirichlet_bcs(domain, V, disp_value, length)
+    gdim = domain.geometry.dim
+        
+    if gdim == 2:
+        # En 2D, on ne donne que (u_x, u_y)
+        disp_value = np.array((0.1 * load_amp, load_amp), dtype=PETSc.ScalarType)
+        left_disp_const  = fem.Constant(domain, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+        right_disp_const = fem.Constant(domain, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+        bcs = dirichlet_bcs_tensile(domain, V, left_disp_const, right_disp_const,coord)
+    else:
+        # En 3D, on donne (u_x, u_y, u_z)
+        disp_value = np.array((0.1 * load_amp, load_amp, 0.0), dtype=PETSc.ScalarType)
+        bcs = dirichlet_bcs(domain, V, disp_value, length)
+    
     uh, problem, solver = build_solver(domain, V, model, state, bcs)
-    ds                  = build_right_facet_tag(domain, length)
+    ds                  = build_right_facet_tag(domain, coord)
 
     # ------------------------------------------------------------ time loop
     force_vec  = []
@@ -901,7 +1016,17 @@ def run_simulation_V3(domain,V,W,WT,config=None, model: PlasticityModel = None, 
 
     for step in range(num_steps + 1):
         t          += dt
-        bcs         = dirichlet_bcs(domain, V, disp_value * t, length)
+        disp_t = disp_value[1] * t
+
+        if gdim == 2:
+            # En 2D, on ne donne que (u_x, u_y)
+            left_disp_const.value  = np.array([0.0, -disp_t], dtype=PETSc.ScalarType)
+            right_disp_const.value = np.array([0.0, disp_t], dtype=PETSc.ScalarType)
+        else:
+            # En 3D, on donne (u_x, u_y, u_z)
+            bcs = dirichlet_bcs(domain, V, disp_value * t, length)
+
+        
         problem.bcs = bcs
 
         solver.solve(uh)
@@ -916,13 +1041,9 @@ def run_simulation_V3(domain,V,W,WT,config=None, model: PlasticityModel = None, 
 
         # Contrainte & Force de réaction
         stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
-        force  = fem.assemble_scalar(fem.form(stress[0, 0] * ds(1)))
+        force  = fem.assemble_scalar(fem.form(stress[1, 1] * ds(1)))
         force_vec.append(force)
 
-        # --------------------------------------------------------------
-        # Projections & E/S Paraview (uniquement si write_output=True)
-        # --------------------------------------------------------------
-        
 
         # Advance internal variables to tₙ₊₁
         model.commit(state, uh)
@@ -932,7 +1053,191 @@ def run_simulation_V3(domain,V,W,WT,config=None, model: PlasticityModel = None, 
 
     return force_vec, displ_val
 
+def run_simulation_write(domain, V, W, WT, config=None, coord=1, model: PlasticityModel = None, write_output: bool = True):
+    """
+    Run the elasto-plastic simulation and write fields to an XDMF/H5 file.
+    Combines V3 externalized signatures/BCs with V2 IO capabilities.
 
+    Parameters
+    ----------
+    domain : Mesh
+    V, W, WT : FunctionSpaces
+    config : dict            – keys from DEFAULT_CONFIG to override
+    coord  : int             – loading direction (0 for X, 1 for Y)
+    model  : PlasticityModel – plasticity model to use.
+    write_output : bool      – if False, skips all XDMF I/O for speed.
+
+    Returns
+    -------
+    force_vec : list of float – reaction force per step
+    displ_val : list of np.ndarray – displacement vector per step
+    """
+    cfg       = {**DEFAULT_CONFIG, **(config or {})}
+    t         = cfg["t_start"]
+    num_steps = cfg["num_steps"]
+    dt        = (cfg["T"] - t) / num_steps
+    load_amp  = cfg["load_amp"]
+    length    = cfg["length"]
+    
+    # ---------------------------------------------------------- output file
+    fic = None
+    if write_output:
+        import os
+        if os.path.exists(cfg['output_dir']):
+            os.system(f"rm -rf {cfg['output_dir']}")
+        os.makedirs(cfg['output_dir'], exist_ok=True)
+        fic = io.XDMFFile(domain.comm, f"{cfg['output_dir']}/{cfg['file_name']}.xdmf", "w")
+        fic.write_mesh(domain)
+
+    # ------------------------------------------------------- plasticity model
+    if model is None:
+        elastic = ElasticModel(E=cfg["E"], nu=cfg["nu"], tdim=domain.topology.dim)
+        model   = J2IsotropicHardening(
+            elastic, sigma_Y=cfg["sigma_Y"], Q_var=cfg["Q_var"], k=cfg["k_hardening"]
+        )
+
+    state = model.create_state(domain, W, WT)
+
+    # ---------------------------------------------------------- BCs + solver
+    gdim = domain.geometry.dim
+        
+    if gdim == 2:
+        disp_value = np.array((0.1 * load_amp, load_amp), dtype=PETSc.ScalarType)
+        left_disp_const  = fem.Constant(domain, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+        right_disp_const = fem.Constant(domain, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+        bcs = dirichlet_bcs_tensile(domain, V, left_disp_const, right_disp_const, coord)
+    else:
+        disp_value = np.array((0.1 * load_amp, load_amp, 0.0), dtype=PETSc.ScalarType)
+        bcs = dirichlet_bcs(domain, V, disp_value, length)
+    
+    uh, problem, solver = build_solver(domain, V, model, state, bcs)
+    ds                  = build_right_facet_tag(domain, coord)
+
+    # ------------------------------------------------------------ time loop
+    force_vec  = []
+    displ_val  = []
+    t_paraview = 0
+
+    # Silence PETSc/SNES logs
+    opts = PETSc.Options()
+    opts["ksp_monitor"] = None
+    opts["snes_monitor"] = None
+    log.set_log_level(log.LogLevel.ERROR)
+
+    for step in range(num_steps + 1):
+        t      += dt
+        disp_t  = disp_value[1] * t
+
+        if gdim == 2:
+            left_disp_const.value  = np.array([0.0, -disp_t], dtype=PETSc.ScalarType)
+            right_disp_const.value = np.array([0.0, disp_t], dtype=PETSc.ScalarType)
+        else:
+            bcs = dirichlet_bcs(domain, V, disp_value * t, length)
+        
+        problem.bcs = bcs
+        solver.solve(uh)
+
+        # --- Calculs physiques essentiels ---
+        eps                  = model.elastic.epsilon(uh)
+        delta_p, delta_eps_p = model.update(state, eps)
+
+        # Stockage du déplacement
+        current_displ = uh.x.array.copy()
+        displ_val.append(current_displ)
+
+        # Contrainte & Force de réaction
+        stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
+        force  = fem.assemble_scalar(fem.form(stress[1, 1] * ds(1)))
+        force_vec.append(force)
+
+        # --------------------------------------------------------------
+        # Projections & Sorties XDMF / Paraview
+        # --------------------------------------------------------------
+        if write_output and fic is not None:
+            uh.name = "displacement"
+            fic.write_function(uh, t_paraview)
+
+            # Total strain
+            eps_proj = fem.Function(WT)
+            eps_proj.interpolate(fem.Expression(eps, WT.element.interpolation_points))
+            eps_proj.name = "Epsilon"
+            fic.write_function(eps_proj, t_paraview)
+
+            # Plastic strain
+            eps_p_proj = fem.Function(WT)
+            eps_p_proj.interpolate(
+                fem.Expression(delta_eps_p + state.eps_p_old, WT.element.interpolation_points)
+            )
+            eps_p_proj.name = "Epsilon_p"
+            fic.write_function(eps_p_proj, t_paraview)
+
+            # Cumulative plastic strain
+            p_proj = fem.Function(W)
+            p_proj.interpolate(
+                fem.Expression(delta_p + state.p_old, W.element.interpolation_points)
+            )
+            p_proj.name = "Cumulative plastic strain"
+            fic.write_function(p_proj, t_paraview)
+
+            # Von Mises stress
+            vm_proj = fem.Function(W)
+            vm_proj.interpolate(
+                fem.Expression(model.elastic.von_mises(stress), W.element.interpolation_points)
+            )
+            vm_proj.name = "Von Mises stress"
+            fic.write_function(vm_proj, t_paraview)
+
+            # Debug: cumulative plastic strain increment error
+            p_incr_proj = fem.Function(W)
+            p_incr_proj.interpolate(
+                fem.Expression(delta_eps_p[coord, coord] - delta_p, W.element.interpolation_points)
+            )
+            p_incr_proj.name = "Cumulative plastic increment error"
+            fic.write_function(p_incr_proj, t_paraview)
+
+            # Debug: cumulated plastic error
+            p_tot_proj = fem.Function(W)
+            p_tot_proj.interpolate(
+                fem.Expression(
+                    (state.eps_p_old[coord, coord] + delta_eps_p[coord, coord]) - (state.p_old + delta_p),
+                    W.element.interpolation_points,
+                )
+            )
+            p_tot_proj.name = "Cumulated plastic error"
+            fic.write_function(p_tot_proj, t_paraview)
+
+            # Sélection des composantes de contraintes selon la dimension (2D vs 3D)
+            if gdim == 2:
+                components = {
+                    "sigma_xx": (0, 0), "sigma_yy": (1, 1), "sigma_xy": (0, 1)
+                }
+            else:
+                components = {
+                    "sigma_xx": (0, 0), "sigma_yy": (1, 1), "sigma_zz": (2, 2),
+                    "sigma_xy": (0, 1), "sigma_xz": (0, 2), "sigma_yz": (1, 2)
+                }
+
+            for name, (i, j) in components.items():
+                s_comp = fem.Function(W)
+                s_comp.name = name
+                s_comp.interpolate(fem.Expression(stress[i, j], W.element.interpolation_points))
+                fic.write_function(s_comp, t_paraview)
+
+            # Hydrostatic pressure
+            pression = fem.Function(W)
+            pression.name = "Pressure"
+            pression.interpolate(fem.Expression(-1.0/3.0 * ufl.tr(stress), W.element.interpolation_points))
+            fic.write_function(pression, t_paraview)
+
+            t_paraview += 1
+
+        # Advance internal variables to tₙ₊₁
+        model.commit(state, uh)
+
+    if fic is not None:
+        fic.close()
+
+    return force_vec, displ_val
 
 
 # ===========================================================================
@@ -956,8 +1261,12 @@ if __name__ == "__main__":
         Q_var       = 50.0,
         k_hardening = 1000.0,
     )
-    forces = run_simulation(config=config)
 
+    domain = load_and_write_mesh(config["mesh_file"])
+
+    V, W, WT = build_function_spaces(domain)
+    forces, _ = run_simulation_write(domain,V,W,WT,config=config)
+    print("pas de soucis la team")
     plt.figure()
     plt.plot(forces)
     plt.xlabel("Time step")

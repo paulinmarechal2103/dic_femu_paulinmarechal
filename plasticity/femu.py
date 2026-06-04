@@ -8,9 +8,8 @@ from hill48_model import Hill48Model,Hill48state
 
 from scipy.optimize import minimize
 
-from skopt import gp_minimize
-from skopt.space import Real
-from skopt.utils import use_named_args
+from image_calibration import *
+from dolfinx import geometry
 
 def compute_direct_h5_diff(h5_file1, h5_file2):
     """
@@ -29,6 +28,8 @@ def compute_direct_h5_diff(h5_file1, h5_file2):
             
             # Calcul de la norme de la différence
             diff = np.linalg.norm(d1 - d2)
+
+
             errors.append(diff)
             
             print(f"Pas {step} : Différence = {diff}")
@@ -41,6 +42,9 @@ def compute_direct_h5_diff(h5_file1, h5_file2):
 # print(f"Différence totale : {diffs}")
 
 #_, u = run_simulation()
+
+
+
 
 
 def compute_u_sim_h5_diff(h5_file, u_sim, base_path = "Function/displacement"):
@@ -88,6 +92,17 @@ def compute_u_sim_raw_h5_diff(f, u_sim, base_path = "Function/displacement"):
         
         # Calcul de la norme de la différence
         diff = np.linalg.norm(d1 - d2)
+
+        #autre métrique : RMSE normalisé par la norme du signal de référence (d1)
+        # diff = d1-d2
+        # rmse = np.mean(diff**2)
+        # diff = rmse / (np.mean(d1**2) + 1e-12)
+
+        
+
+        
+
+
         errors.append(diff)
         
         #print(f"Pas {step} : Différence = {diff}")
@@ -232,6 +247,63 @@ def compute_J2_raw_h5_error_from_parameters(domain,V, W, WT,f, params = [200_000
 #     diffs = compute_hill_raw_h5_error_from_parameters(f)
 #     print(f"Différence totale : {diffs}")
 
+def evaluate_sim_at_dic_points(domain, u_sim, pts_dic_img, tform_cad_to_img_4d):
+    """Calcule la position des points DIC dans le repère CAD via l'inverse 
+    de la matrice 4x4, et y évalue le champ de déplacement FE (u_sim).
+
+    Args:
+        domain: dolfinx.mesh.Mesh du domaine de simulation (maillage CAD)
+        u_sim: La fonction dolfinx du champ de déplacement simulé
+        pts_dic_img: Tableau (N, 2) des coordonnées (x_c, y_c) de la DIC (pixels)
+        tform_cad_to_img_4d: Matrice de transformation 4x4 (CAD -> Image)
+    Returns:
+        u_sim_at_dic: Tableau (N, 2) des déplacements simulés évalués aux positions DIC transformées en CAD
+        valid_indices: Indices des points DIC qui ont été trouvés à l'intérieur du maillage CAD et pour lesquels u_sim a été évalué
+    """
+
+    # 1. Inversion de la matrice pour passer de l'Image -> CAD
+    tform_img_to_cad = np.linalg.inv(tform_cad_to_img_4d)
+    
+    # 2. Passage des points DIC en coordonnées homogènes 3D (N, 4)
+    N = pts_dic_img.shape[0]
+    pts_hom = np.ones((N, 4))
+    pts_hom[:, 0] = pts_dic_img[:, 0] # x_c
+    pts_hom[:, 1] = pts_dic_img[:, 1] # y_c
+    pts_hom[:, 2] = 0.0               # z = 0 en DIC 2D
+
+    # 3. Transformation des positions vers le repère CAD
+    pts_cad = (tform_img_to_cad @ pts_hom.T).T[:, :3]
+
+    # 4. Détection des collisions avec les éléments du maillage EF
+    bb_tree = geometry.bounding_box_tree(domain, domain.topology.dim)
+    cell_candidates = geometry.compute_collisions_points(bb_tree, pts_cad)
+    colliding_cells = geometry.compute_colliding_cells(domain, cell_candidates, pts_cad)
+
+    valid_pts_cad = []
+    cells_for_eval = []
+    valid_indices = []
+
+    # Filtrage : on ne garde que les points DIC qui tombent VRAIMENT dans le maillage CAD
+    for i, pt in enumerate(pts_cad):
+        if len(colliding_cells.links(i)) > 0:
+            cells_for_eval.append(colliding_cells.links(i)[0])
+            valid_pts_cad.append(pt)
+            valid_indices.append(i)
+
+    if len(valid_pts_cad) == 0:
+        print("[Attention] Aucun point de la DIC n'a été trouvé à l'intérieur du maillage CAD.")
+        return np.array([]), [], tform_img_to_cad
+
+    valid_pts_cad = np.array(valid_pts_cad)
+
+    # 5. Évaluation native de u_sim aux coordonnées CAD valides (rend un tableau Nx2)
+    u_sim_at_dic = u_sim.eval(valid_pts_cad, cells_for_eval)
+
+    return u_sim_at_dic, valid_indices, tform_img_to_cad
+
+
+
+
 
 bounds_ref = [
     (150_000, 250_000),   # E [MPa]
@@ -357,7 +429,15 @@ def femu_V3(
         h5_file,
         params0=[200_500.0, 0.29, 102.0, 52.0, 1_010.0],
         bounds=bounds_ref,
+        params_names=["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
     ):
+    """
+    domain : dolfinx.mesh.Mesh déjà créé à partir du maillage PyVista
+    V, W, WT : espaces de fonctions déjà construits pour ce maillage
+    h5_file : chemin vers le fichier de référence contenant les déplacements mesurés
+    params0 : liste des paramètres initiaux pour l'optimisation (E, nu, sigma_Y, Q_var, k_hardening)
+    bounds : liste des tuples (min, max) pour chaque paramètre, utilisée pour la normalisation et les contraintes de l'optimiseur
+    """
     # --- Configuration du Plot ---
     plt.ion()
     fig = plt.figure(figsize=(16, 10))
@@ -408,7 +488,7 @@ def femu_V3(
                 for i in range(len(params_phys)):
                     ax_params[i].clear()
                     ax_params[i].plot(data_p[:, i], color='royalblue')
-                    ax_params[i].set_title(f"P{i}: {params_phys[i]:.2e}", fontsize=9)
+                    ax_params[i].set_title(f"{params_names[i]}: {params_phys[i]:.2e}", fontsize=9)
                     ax_params[i].grid(True, alpha=0.2)
                 
                 plt.tight_layout()
@@ -426,7 +506,7 @@ def femu_V3(
             params0_norm,
             method='L-BFGS-B',
             bounds=bounds_norm,
-            options={'ftol': 1e-5, 'gtol': 1e-4, 'maxiter': 150, 'disp': True, 'eps': 1e-3}
+            options={'ftol': 1e-6, 'gtol': 1e-5, 'maxiter': 150, 'disp': True, 'eps': 1e-2}
         )
         
     plt.ioff()
@@ -440,17 +520,20 @@ def femu_V3(
     return result_phys
 
 
+
 if __name__ == "__main__":
     domain = load_and_write_mesh("Flat_specimen_refined.msh")
-
+    
     V, W, WT = build_function_spaces(domain)
+    real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]
     from random import uniform,seed
     seed(42)  # Pour la reproductibilité
     perturbation_percentage = 0.05  # 5% de perturbation aléatoire
-    normalized_result = normalize_params([200_000.0, 0.3, 100.0, 50.0, 1_000.0], bounds_ref_J2)
+    normalized_result = normalize_params(real_params, bounds_ref_J2)
     normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
     parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2)
     optimizer_result = femu_V3(domain,V, W, WT,"femu_files/non_refined.h5", parameters_disturbed, bounds_ref_J2)
     print("Optimized parameters (phys):", optimizer_result.x)
+    print("normalized error:", [abs(optimizer_result.x[i] - real_params[i])/abs(real_params[i]) for i in range(len(real_params))])
 
 

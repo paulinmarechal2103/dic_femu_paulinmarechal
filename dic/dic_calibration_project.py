@@ -125,24 +125,11 @@ def extract_u_to_dolfinx(pv_mesh: pv.UnstructuredGrid, dolfinx_mesh: dolfinx.mes
     return u_function
 
 
+
+
+
 # =============================================================================
 # SCRIPT DE TEST PRINCIPAL
 # =============================================================================
 if __name__ == "__main__":
-    # Remplace par le nom exact ou le chemin de ton fichier CSV de Vic-2D
-    CSV_VIC2D = "VK03-1-16-0201_0.csv" 
-    
-    if not os.path.exists(CSV_VIC2D):
-        print(f"[ERREUR] Le fichier {CSV_VIC2D} est introuvable dans le répertoire courant.")
-    else:
-        # Exécution séquentielle des 3 étapes
-        pv_grid = import_vic2d_csv_to_pv(CSV_VIC2D, alpha=20.0)
-        mesh_fx = create_dolfinx_mesh_from_pv(pv_grid)
-        u_meas_fx = extract_u_to_dolfinx(pv_grid, mesh_fx)
-        
-        print("\n[SUCCÈS] Pipeline d'importation validé !")
-        print(f" -> Nombre de triangles générés dans FeniCSx : {mesh_fx.topology.index_map(mesh_fx.topology.dim).size_global}")
-        
-        # Petit calcul de contrôle : calcul de la norme L2 du déplacement importé
-        norm_l2 = dolfinx.fem.assemble_scalar(dolfinx.fem.form(ufl.inner(u_meas_fx, u_meas_fx) * ufl.dx))
-        print(f" -> Norme L2 du déplacement dans FeniCSx : {norm_l2:.4e}")
+    pass

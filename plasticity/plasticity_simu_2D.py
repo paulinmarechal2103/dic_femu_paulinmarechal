@@ -118,35 +118,24 @@ def project(v, target_func, bcs=None):
 # Boundary conditions
 # ===========================================================================
 
-
-def dirichlet_bcs_tensile(domain, space, disp_value):
-    """
-    Symmetric tensile BCs: automatically detects left and right boundaries
-    based on the mesh bounding box.
-    """
+def dirichlet_bcs_tensile(domain, space, left_disp_constant, right_disp_constant, coord=0):
     fdim = domain.topology.dim - 1
 
-    # 1. Détection automatique des bornes géométriques en X
-    # On extrait les coordonnées de tous les nœuds du maillage
-    x_coords = domain.geometry.x[:, 0]
+    # CORRECTION : Extraire la colonne X de TOUS les nœuds
+    x_coords = domain.geometry.x[:, coord]
     x_min = np.min(x_coords)
     x_max = np.max(x_coords)
 
-    # 2. Définition des fonctions de localisation avec une tolérance numérique
-    # (indispensable pour éviter les ratés dus aux arrondis machine)
     tol = 1e-6
-    left_facets  = mesh.locate_entities_boundary(
-        domain, fdim, lambda x: x[0] <= (x_min + tol))
-    right_facets = mesh.locate_entities_boundary(
-        domain, fdim, lambda x: x[0] >= (x_max - tol))
+    left_facets  = mesh.locate_entities_boundary(domain, fdim, lambda x: x[coord] <= (x_min + tol))
+    right_facets = mesh.locate_entities_boundary(domain, fdim, lambda x: x[coord] >= (x_max - tol))
 
-    # 3. Application des conditions aux limites
-    bc_left  = fem.dirichletbc(fem.Constant(domain, -disp_value),
+    # On applique les bcs directement sur les objets Constant passés en argument
+    bc_left  = fem.dirichletbc(left_disp_constant,
                                fem.locate_dofs_topological(space, fdim, left_facets), space)
-    bc_right = fem.dirichletbc(fem.Constant(domain,  disp_value),
+    bc_right = fem.dirichletbc(right_disp_constant,
                                fem.locate_dofs_topological(space, fdim, right_facets), space)
     return [bc_left, bc_right]
-
 
 
 #with io.XDMFFile(domain.comm, xdmf_file_path, "r") as xdmf_ref:
@@ -267,24 +256,38 @@ def run_simulation_2D(xdmf_bc_ref_path, config=None, model: PlasticityModel = No
 
     # ---------------------------------------------------------- BCs + solver
     disp_value          = np.array((load_amp, 0.1 * load_amp), dtype=PETSc.ScalarType)
-    bcs                 = dirichlet_bcs(domain, V, xdmf_bc_ref_path, "displacement", 0)
+    left_disp_const  = fem.Constant(domain, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+    right_disp_const = fem.Constant(domain, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+
+    if xdmf_bc_ref_path is None:
+        bcs = dirichlet_bcs_tensile(domain, V, left_disp_const, right_disp_const,1)
+    else:
+        # Si vous utilisez un fichier, assurez-vous d'adapter cette logique
+        bcs = dirichlet_bcs(domain, V, xdmf_bc_ref_path, "displacement", 0)
+
+    # Le solveur est construit UNE SEULE FOIS avec ces bcs connectées aux constantes
     uh, problem, solver = build_solver(domain, V, model, state, bcs)
 
     # ------------------------------------------------------------ time loop
     force_vec  = []
     displ_val  = []
     t_paraview = 0
-
     # Silence PETSc/SNES logs for cleaner FEMU output
     opts = PETSc.Options()
     opts["ksp_monitor"] = None
     opts["snes_monitor"] = None
     log.set_log_level(log.LogLevel.ERROR)
-
     for step in range(num_steps + 1):
         t          += dt
         print(disp_value * t)
-        bcs         = dirichlet_bcs(domain, V, xdmf_bc_ref_path, "displacement", step)
+        if xdmf_bc_ref_path is None:
+            # CORRECTION : On met à jour la valeur interne des constantes
+            # Pas besoin de toucher à problem.bcs
+            current_disp = disp_value[0] * t
+            left_disp_const.value  = np.array([-current_disp, 0.0], dtype=PETSc.ScalarType)
+            right_disp_const.value = np.array([current_disp, 0.0], dtype=PETSc.ScalarType)
+        else:
+            bcs = dirichlet_bcs(domain, V, xdmf_bc_ref_path, "displacement", step)
         problem.bcs = bcs
 
         solver.solve(uh)
@@ -391,10 +394,11 @@ def run_simulation_2D(xdmf_bc_ref_path, config=None, model: PlasticityModel = No
 # ===========================================================================
 if __name__ == "__main__":
     config = dict(
-        mesh_file = "carre.msh",
+        mesh_file = "astar_2D_coarse.xdmf",
         output_dir = "results_plasticity",
-        file_name = "res",
-        num_steps = 5,
+        file_name = "astar_coarsed",
+        num_steps = 50,
+        load_amp = 0.01, 
     )
     #load_and_write_2D_mesh(config["mesh_file"])
-    run_simulation_2D("test_import_bc.h5",config)
+    run_simulation_2D(None,config)
