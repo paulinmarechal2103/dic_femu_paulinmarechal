@@ -1,4 +1,4 @@
-import plasticity_simu
+from plasticity_simu import *
 
 import os
 from abc import ABC, abstractmethod
@@ -66,7 +66,7 @@ class Hill48state():
         self._W        = W
         self._WT       = WT
 
-class Hill48Model(plasticity_simu.PlasticityModel):
+class Hill48Model(PlasticityModel):
     """
         Hill48 anisotropic plasticity with Voce isotropic hardening.
 
@@ -217,17 +217,34 @@ def plot_hill_surface(params, sigma_y_val=None):
 # Utilisation :
 
 if __name__ == "__main__":
-    plot_hill_surface(hill_params)
+    config = dict(
+        t_start     = 0.0,
+        T           = 3.0,
+        num_steps   = 50,
+        load_amp    = 0.01,       # amplitude of the applied displacement
+        length      = 10.0,       # half-length of the specimen
+        mesh_file   = "carre_trou.msh",
+        output_dir  = "results_plasticity",
+        file_name    = "carre_trou",
+        # Elastic constants (used when no model is supplied)
+        E           = 200_000.0,
+        nu          = 0.3,
+        # J2 isotropic hardening parameters (used when no model is supplied)
+        sigma_Y     = 100.0,
+        Q_var       = 50.0,
+        k_hardening = 1000.0,
+    )
 
+    domain = load_and_write_mesh(config["mesh_file"])
 
-# forces = plasticity_simu.run_simulation(hill_params, modèle_hill48)
-
-
-# plt.figure()
-# plt.plot(forces[0])
-# plt.xlabel("Time step")
-# plt.ylabel("Reaction force")
-# plt.title("Reaction force vs. time step")
-# plt.grid(True)
-# plt.tight_layout()
-# plt.show()
+    V, W, WT = build_function_spaces(domain)
+    forces, _ = run_simulation_V3(domain,V,W,WT,config=config)
+    print("pas de soucis la team")
+    plt.figure()
+    plt.plot(forces)
+    plt.xlabel("Time step")
+    plt.ylabel("Reaction force")
+    plt.title("Reaction force vs. time step")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()

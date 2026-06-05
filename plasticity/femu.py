@@ -6,7 +6,7 @@ import numpy as np
 from plasticity_simu import *
 from hill48_model import Hill48Model,Hill48state
 
-from scipy.optimize import minimize
+from scipy.optimize import minimize,least_squares, Bounds
 
 from image_calibration import *
 from dolfinx import geometry
@@ -109,7 +109,43 @@ def compute_u_sim_raw_h5_diff(f, u_sim, base_path = "Function/displacement"):
         step += 1
             
     return np.sum(errors)
+    
+def compute_u_residuals(f, u_sim, base_path = "Function/displacement"):
+    """
+    Compute the total displacement difference between 
+    H5 reference raw file extracted with h5py
+    and simulation output array.
+    """
+    errors = []
+    
+    step = 0
+    while str(step) in f[base_path]:
+        d1 = f[f"{base_path}/{step}"][:]
+        d2 = u_sim[step]
+        
+        # FIX: Reshape the flattened 1D array to match (num_nodes, 3)
+        d2 = d2.reshape(d1.shape)
+        
+        # Calcul de la norme de la différence
+        diff = d1 - d2
+        diff = np.array(diff).flatten()  
 
+        #autre métrique : RMSE normalisé par la norme du signal de référence (d1)
+        # diff = d1-d2
+        # rmse = np.mean(diff**2)
+        # diff = rmse / (np.mean(d1**2) + 1e-12)
+
+        
+
+        
+
+
+        errors.append(diff)
+        
+        #print(f"Pas {step} : Différence = {diff}")
+        step += 1
+    errors = np.array(errors).flatten()  # Convertir la liste de tableaux en un seul tableau 1D        
+    return errors
 
 # with h5py.File("femu_files/donnes_ref.h5", 'r') as f:
 #     diffs = compute_u_sim_raw_h5_diff(f, u)
@@ -243,66 +279,119 @@ def compute_J2_raw_h5_error_from_parameters(domain,V, W, WT,f, params = [200_000
         error = 1e3
     return error
 
-# with h5py.File("femu_files/res.h5", 'r') as f:
-#     diffs = compute_hill_raw_h5_error_from_parameters(f)
-#     print(f"Différence totale : {diffs}")
 
-def evaluate_sim_at_dic_points(domain, u_sim, pts_dic_img, tform_cad_to_img_4d):
-    """Calcule la position des points DIC dans le repère CAD via l'inverse 
-    de la matrice 4x4, et y évalue le champ de déplacement FE (u_sim).
 
-    Args:
-        domain: dolfinx.mesh.Mesh du domaine de simulation (maillage CAD)
-        u_sim: La fonction dolfinx du champ de déplacement simulé
-        pts_dic_img: Tableau (N, 2) des coordonnées (x_c, y_c) de la DIC (pixels)
-        tform_cad_to_img_4d: Matrice de transformation 4x4 (CAD -> Image)
-    Returns:
-        u_sim_at_dic: Tableau (N, 2) des déplacements simulés évalués aux positions DIC transformées en CAD
-        valid_indices: Indices des points DIC qui ont été trouvés à l'intérieur du maillage CAD et pour lesquels u_sim a été évalué
+def compute_J2_residuals(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]): 
     """
+    Compute the total displacement difference between 
+    H5 reference raw file extracted with h5py
+    and simulation output array for a given set of Hill48 parameters.
 
-    # 1. Inversion de la matrice pour passer de l'Image -> CAD
-    tform_img_to_cad = np.linalg.inv(tform_cad_to_img_4d)
+    params should be a list or array containing the following parameters in order:
+    (E, nu, sigma_Y, Q_var, k_hardening)
     
-    # 2. Passage des points DIC en coordonnées homogènes 3D (N, 4)
-    N = pts_dic_img.shape[0]
-    pts_hom = np.ones((N, 4))
-    pts_hom[:, 0] = pts_dic_img[:, 0] # x_c
-    pts_hom[:, 1] = pts_dic_img[:, 1] # y_c
-    pts_hom[:, 2] = 0.0               # z = 0 en DIC 2D
+    """
+    hill_params = dict(
+    t_start     = 0.0,
+    T           = 3.0,
+    num_steps   = 50,
+    load_amp    = 0.01,       # amplitude of the applied displacement
+    length      = 10.0,       # half-length of the specimen
+    mesh_file   = "Flat_specimen_refined.msh",
+    output_dir  = "results_plasticity",
+    file_name    = "donnes_ref",
+    # Elastic constants (used when no model is supplied)
+    E           = params[0],
+    nu          = params[1],
+    # J2 isotropic hardening parameters (used when no model is supplied)
+    sigma_Y     = params[2],
+    Q_var       = params[3],
+    k_hardening = params[4],
+    )
 
-    # 3. Transformation des positions vers le repère CAD
-    pts_cad = (tform_img_to_cad @ pts_hom.T).T[:, :3]
+    # if not is_hill48_physically_valid(params):
+    #     print("--> [REJET PRÉ-FEM] Paramètres non physiques ou Hill48 non convexe.")
+    #     raise ValueError("Hill48 non convexe ou paramètres non physiques")
 
-    # 4. Détection des collisions avec les éléments du maillage EF
-    bb_tree = geometry.bounding_box_tree(domain, domain.topology.dim)
-    cell_candidates = geometry.compute_collisions_points(bb_tree, pts_cad)
-    colliding_cells = geometry.compute_colliding_cells(domain, cell_candidates, pts_cad)
+    model = J2IsotropicHardening(
+        elastic=ElasticModel(hill_params["E"], hill_params["nu"], tdim=3),
+        sigma_Y=hill_params["sigma_Y"],
+        Q_var=hill_params["Q_var"],
+        k=hill_params["k_hardening"]
+    )
 
-    valid_pts_cad = []
-    cells_for_eval = []
-    valid_indices = []
+    try:
+        # On tente de lancer la simulation dolfinx
+        _, u_sim = run_simulation_V3(domain, V, W, WT, hill_params, model=model, write_output=False)
+        error = compute_u_residuals(f, u_sim)
+    except RuntimeError as e:
+        # Si le solveur de Newton échoue, on ne crash pas !
+        print(f"--> [Newton Divergence] Paramètres instables détectés. Pénalisation de l'erreur.")
+        # On renvoie une erreur artificiellement grande pour dire à SciPy de rebrousser chemin
+        error = 1e3
+    return error
 
-    # Filtrage : on ne garde que les points DIC qui tombent VRAIMENT dans le maillage CAD
-    for i, pt in enumerate(pts_cad):
-        if len(colliding_cells.links(i)) > 0:
-            cells_for_eval.append(colliding_cells.links(i)[0])
-            valid_pts_cad.append(pt)
-            valid_indices.append(i)
+def compute_hill_residuals(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.900, 0.600, 0.400, 1.7, 1.3, 1.350]):
+    """
+    Compute the total displacement difference between 
+    H5 reference raw file extracted with h5py
+    and simulation output array for a given set of Hill48 parameters.
 
-    if len(valid_pts_cad) == 0:
-        print("[Attention] Aucun point de la DIC n'a été trouvé à l'intérieur du maillage CAD.")
-        return np.array([]), [], tform_img_to_cad
+    params should be a list or array containing the following parameters in order:
+    (E, nu, sigma_Y, Q_var, k_hardening, F, G, H, L, M, N)
+    
+    """
+    hill_params = dict(
+    t_start     = 0.0,
+    T           = 3.0,
+    num_steps   = 50,
+    load_amp    = 0.01,       # amplitude of the applied displacement
+    length      = 10.0,       # half-length of the specimen
+    mesh_file   = "Flat_specimen_refined.msh",
+    output_dir  = "results_plasticity",
+    file_name    = "donnes_ref",
+    # Elastic constants (used when no model is supplied)
+    E           = params[0],
+    nu          = params[1],
+    # J2 isotropic hardening parameters (used when no model is supplied)
+    sigma_Y     = params[2],
+    Q_var       = params[3],
+    k_hardening = params[4],
+    F = params[5],  # Anisotropie dans le plan transverse
+    G = params[6],  # Anisotropie dans le plan longitudinal
+    H = params[7],  # Terme d'interaction (souvent proche de 0.5)
+    L = params[8],  # Cisaillement hors-plan (souvent supposé isotrope = 1.5)
+    M = params[9],  # Cisaillement hors-plan (souvent supposé isotrope = 1.5)
+    N = params[10] 
+    )
 
-    valid_pts_cad = np.array(valid_pts_cad)
+    # if not is_hill48_physically_valid(params):
+    #     print("--> [REJET PRÉ-FEM] Paramètres non physiques ou Hill48 non convexe.")
+    #     raise ValueError("Hill48 non convexe ou paramètres non physiques")
 
-    # 5. Évaluation native de u_sim aux coordonnées CAD valides (rend un tableau Nx2)
-    u_sim_at_dic = u_sim.eval(valid_pts_cad, cells_for_eval)
+    model_hill48 = Hill48Model(
+        elastic=ElasticModel(hill_params["E"], hill_params["nu"], tdim=3),
+        sigma_Y=hill_params["sigma_Y"],
+        H=hill_params["H"],
+        F=hill_params["F"],
+        G=hill_params["G"],
+        L=hill_params["L"],
+        M=hill_params["M"],
+        N=hill_params["N"],
+        Q_var=hill_params["Q_var"],
+        k_hardening=hill_params["k_hardening"]
+    )
 
-    return u_sim_at_dic, valid_indices, tform_img_to_cad
-
-
-
+    try:
+        # On tente de lancer la simulation dolfinx
+        _, u_sim = run_simulation_V3(domain, V, W, WT, hill_params,1, model=model_hill48, write_output=False)
+        error = compute_u_residuals(f, u_sim)
+    except RuntimeError as e:
+        # Si le solveur de Newton échoue, on ne crash pas !
+        print(f"--> [Newton Divergence] Paramètres instables détectés. Pénalisation de l'erreur.")
+        # On renvoie une erreur artificiellement grande pour dire à SciPy de rebrousser chemin
+        error = 1e3
+    return error
 
 
 bounds_ref = [
@@ -320,7 +409,7 @@ bounds_ref = [
 ]
 
 bounds_ref_J2 = [
-    (150_000, 250_000),   # E [MPa]
+    (199000, 201_000),   # E [MPa]
     (0.25, 0.35),         # nu 
     (10.0, 500.0),        # sigma_Y [MPa]
     (20.0, 400.0),         # Q_var [MPa]
@@ -465,7 +554,7 @@ def femu_V3(
             # 1. Dénormalisation pour retrouver les valeurs physiques
             params_phys = denormalize_params(params_norm, bounds)
             
-            print(f"{str(datetime.now())} \nCurrent params (phys): {params_phys}\n")
+            print(f"{str(datetime.now())} \nEssai n°{len(history_err)}, iteration = {len(history_err)//(len(params_norm)+1)}\nCurrent params (phys): {params_phys}\n")
             
             # 2. Calcul de l'erreur avec les valeurs physiques
             error = compute_J2_raw_h5_error_from_parameters(domain,V,W,WT,f, params_phys)
@@ -476,27 +565,28 @@ def femu_V3(
             data_p = np.array(history_params)
             
             # 4. Mise à jour graphique (avec les valeurs physiques)
-            try:
-                # Plot Erreur
-                ax_err.clear()
-                ax_err.plot(history_err, color='firebrick', lw=1.5)
-                ax_err.set_yscale('log')
-                ax_err.set_title("Erreur (Log)")
-                ax_err.grid(True, which="both", ls="-", alpha=0.2)
+            if len(history_err)%(len(params_norm)+1)==0: 
+                try:
+                    # Plot Erreur
+                    ax_err.clear()
+                    ax_err.plot(history_err, color='firebrick', lw=1.5)
+                    ax_err.set_yscale('log')
+                    ax_err.set_title("Erreur (Log)")
+                    ax_err.grid(True, which="both", ls="-", alpha=0.2)
 
-                # Plot Paramètres (Physiques)
-                for i in range(len(params_phys)):
-                    ax_params[i].clear()
-                    ax_params[i].plot(data_p[:, i], color='royalblue')
-                    ax_params[i].set_title(f"{params_names[i]}: {params_phys[i]:.2e}", fontsize=9)
-                    ax_params[i].grid(True, alpha=0.2)
-                
-                plt.tight_layout()
-                plt.pause(0.001)
-            except:
-                # Permet de continuer si la fenêtre est fermée
-                pass
-                
+                    # Plot Paramètres (Physiques)
+                    for i in range(len(params_phys)):
+                        ax_params[i].clear()
+                        ax_params[i].plot(data_p[:, i], color='royalblue')
+                        ax_params[i].set_title(f"{params_names[i]}: {params_phys[i]:.2e}", fontsize=9)
+                        ax_params[i].grid(True, alpha=0.2)
+                    
+                    plt.tight_layout()
+                    plt.pause(0.001)
+                except:
+                    # Permet de continuer si la fenêtre est fermée
+                    pass
+                    
             print(f"Error: {error}")
             return error
 
@@ -506,7 +596,7 @@ def femu_V3(
             params0_norm,
             method='L-BFGS-B',
             bounds=bounds_norm,
-            options={'ftol': 1e-6, 'gtol': 1e-5, 'maxiter': 150, 'disp': True, 'eps': 1e-2}
+            options={'ftol': 1e-7, 'gtol': 1e-5, 'maxiter': 150, 'disp': True, 'eps': 1e-3}
         )
         
     plt.ioff()
@@ -521,19 +611,348 @@ def femu_V3(
 
 
 
+def femu_res(
+        domain,
+        V, W, WT,
+        h5_file,
+        params0=[200_500.0, 0.29, 102.0, 52.0, 1_010.0],
+        bounds=bounds_ref_J2,
+        params_names=["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
+    ):
+    """
+    domain : dolfinx.mesh.Mesh déjà créé à partir du maillage PyVista
+    V, W, WT : espaces de fonctions déjà construits pour ce maillage
+    h5_file : chemin vers le fichier de référence contenant les déplacements mesurés
+    params0 : liste des paramètres initiaux pour l'optimisation (E, nu, sigma_Y, Q_var, k_hardening)
+    bounds : liste des tuples (min, max) pour chaque paramètre, utilisée pour la normalisation et les contraintes de l'optimiseur
+    """
+    # --- Configuration du Plot ---
+    plt.ion()
+    fig = plt.figure(figsize=(16, 10))
+    
+    # 11 paramètres + 1 erreur = 12 slots (3 lignes x 4 colonnes)
+    gs = fig.add_gridspec(3, 4)
+    ax_err = fig.add_subplot(gs[0, 0]) # Erreur en haut à gauche
+    
+    # On crée les axes pour les 11 paramètres
+    ax_params = []
+    for i in range(1, 6):
+        row, col = divmod(i, 4)
+        ax_params.append(fig.add_subplot(gs[row, col]))
+    
+    history_err = []
+    history_params = [] # On va stocker les paramètres PHYSIQUES (dénormalisés) pour le plot
+
+    # --- Préparation de la Normalisation pour SciPy ---
+    # L-BFGS-B va travailler entre 0 et 1 pour chaque paramètre
+    params0_norm = normalize_params(params0, bounds)
+    bounds_norm = Bounds([0.0]*len(params0), [1.0]*len(params0))
+
+    with h5py.File(h5_file, 'r') as f:
+        def objective_function(params_norm):
+            # 1. Dénormalisation pour retrouver les valeurs physiques
+            params_phys = denormalize_params(params_norm, bounds)
+            
+            print(f"{str(datetime.now())} \nsimu EF n°{len(history_err)}, iteration = {len(history_err)//(len(params_norm)+1)}\nCurrent params (phys): {params_phys}\n")
+            
+            # 2. Calcul de l'erreur avec les valeurs physiques
+            error = compute_J2_residuals(domain,V,W,WT,f, params_phys)
+            
+            # 3. Stockage pour l'historique
+            history_err.append(error)
+            history_params.append(params_phys)
+            data_p = np.array(history_params)
+            
+            print(f"Error: {error}")
+            return error
+
+        # L'optimiseur reçoit les versions normalisées (0 à 1)
+        result_norm = least_squares(
+            objective_function,
+            params0_norm,
+            method='trf',
+            bounds=bounds_norm,
+            ftol=1e-7, gtol=1e-5, max_nfev=150, verbose=2, x_scale='jac', diff_step=1e-3
+        )
+        
+    plt.ioff()
+    plt.show()
+    
+    # --- Post-traitement ---
+    # On reconstruit l'objet résultat pour renvoyer les paramètres physiques optimaux
+    result_phys = result_norm
+    result_phys.x = np.array(denormalize_params(result_norm.x, bounds))
+    
+    return result_phys
+
+def femu_res_J2(
+        domain,
+        V, W, WT,
+        h5_file,
+        params0=[200_500.0, 0.29, 102.0, 52.0, 1_010.0],
+        bounds=bounds_ref_J2,
+        params_names=["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
+    ):
+    """
+    domain : dolfinx.mesh.Mesh déjà créé à partir du maillage PyVista
+    V, W, WT : espaces de fonctions déjà construits pour ce maillage
+    h5_file : chemin vers le fichier de référence contenant les déplacements mesurés
+    params0 : liste des paramètres initiaux pour l'optimisation (E, nu, sigma_Y, Q_var, k_hardening)
+    bounds : liste des tuples (min, max) pour chaque paramètre, utilisée pour la normalisation et les contraintes de l'optimiseur
+    """
+    # --- Configuration du Plot ---
+    plt.ion()
+    fig = plt.figure(figsize=(16, 10))
+    
+    # 11 paramètres + 1 erreur = 12 slots (3 lignes x 4 colonnes)
+    gs = fig.add_gridspec(3, 4)
+    ax_err = fig.add_subplot(gs[0, 0]) # Erreur en haut à gauche
+    
+    # On crée les axes pour les paramètres
+    ax_params = []
+    for i in range(1, 6):
+        row, col = divmod(i, 4)
+        ax_params.append(fig.add_subplot(gs[row, col]))
+    
+    history_err = []    # Stockera la norme scalaire (somme des carrés) pour le plot
+    history_params = [] # Stockera les paramètres PHYSIQUES (dénormalisés) pour le plot
+
+    # --- Préparation de la Normalisation pour SciPy ---
+    params0_norm = normalize_params(params0, bounds)
+    bounds_norm = Bounds([0.0]*len(params0), [1.0]*len(params0))
+
+    with h5py.File(h5_file, 'r') as f:
+        def objective_function(params_norm):
+            # 1. Dénormalisation pour retrouver les valeurs physiques
+            params_phys = denormalize_params(params_norm, bounds)
+            
+            print(f"{str(datetime.now())} \nsimu EF n°{len(history_err)}, iteration = {len(history_err)//(len(params_norm)+1)}\nCurrent params (phys): {params_phys}\n")
+            
+            # 2. Calcul des résidus (doit être un vecteur/array 1D pour least_squares)
+            residuals = compute_J2_residuals(domain, V, W, WT, f, params_phys)
+            
+            # 3. Calcul de la norme (scalaire) pour le suivi graphique
+            # least_squares minimise (0.5 * sum(r**2)). On stocke la somme des carrés.
+            error_scalar = np.sum(np.square(residuals))
+            
+            # 4. Stockage pour l'historique
+            history_err.append(error_scalar)
+            history_params.append(params_phys)
+            data_p = np.array(history_params)
+            
+            # 5. Mise à jour graphique (avec les valeurs physiques)
+            # Rafraîchissement estimé à chaque itération de l'optimiseur (Jacobien inclus)
+            if True: #len(history_err) % (len(params_norm) + 1) == 0: 
+                try:
+                    # Plot Erreur (Somme des carrés des résidus)
+                    ax_err.clear()
+                    ax_err.plot(history_err, color='firebrick', lw=1.5)
+                    ax_err.set_yscale('log')
+                    ax_err.set_title("Norme Résidus (Log $\sum r^2$)")
+                    ax_err.grid(True, which="both", ls="-", alpha=0.2)
+
+                    # Plot Paramètres (Physiques)
+                    for i in range(len(params_phys)):
+                        ax_params[i].clear()
+                        ax_params[i].plot(data_p[:, i], color='royalblue')
+                        ax_params[i].set_title(f"{params_names[i]}: {params_phys[i]:.2e}", fontsize=9)
+                        ax_params[i].grid(True, alpha=0.2)
+                    
+                    plt.tight_layout()
+                    plt.pause(0.001)
+                except Exception as e:
+                    # Permet de continuer si la fenêtre est fermée ou s'il y a un souci d'affichage
+                    pass
+                    
+            print(f"Residuals norm (sum of squares): {error_scalar}")
+            
+            # least_squares a STRICTEMENT besoin du vecteur de résidus brut
+            return residuals
+
+        # L'optimiseur reçoit les versions normalisées (0 à 1)
+        result_norm = least_squares(
+            objective_function,
+            params0_norm,
+            method='trf',
+            bounds=bounds_norm,
+            ftol=1e-7, gtol=1e-5, max_nfev=150, verbose=2, x_scale='jac', diff_step=1e-3
+        )
+        
+    plt.ioff()
+    plt.show()
+    
+    # --- Post-traitement ---
+    # On reconstruit l'objet résultat pour renvoyer les paramètres physiques optimaux
+    result_phys = result_norm
+    result_phys.x = np.array(denormalize_params(result_norm.x, bounds))
+    
+    return result_phys
+
+def femu_res_hill(
+        domain,
+        V, W, WT,
+        h5_file,
+        params0=[200_500.0, 0.29, 102.0, 52.0, 1_010.0],
+        bounds=bounds_ref,
+        params_names=["E", "nu", "sigma_Y", "Q_var", "k_hardening", "F", "G", "H", "L", "M", "N"]
+    ):
+    """
+    domain : dolfinx.mesh.Mesh déjà créé à partir du maillage PyVista
+    V, W, WT : espaces de fonctions déjà construits pour ce maillage
+    h5_file : chemin vers le fichier de référence contenant les déplacements mesurés
+    params0 : liste des paramètres initiaux pour l'optimisation (E, nu, sigma_Y, Q_var, k_hardening)
+    bounds : liste des tuples (min, max) pour chaque paramètre, utilisée pour la normalisation et les contraintes de l'optimiseur
+    """
+    # --- Configuration du Plot ---
+    plt.ion()
+    fig = plt.figure(figsize=(16, 10))
+    
+    # 11 paramètres + 1 erreur = 12 slots (3 lignes x 4 colonnes)
+    gs = fig.add_gridspec(3, 4)
+    ax_err = fig.add_subplot(gs[0, 0]) # Erreur en haut à gauche
+    
+    # On crée les axes pour les paramètres
+    ax_params = []
+    for i in range(1, len(params_names)+1):
+        row, col = divmod(i, 4)
+        ax_params.append(fig.add_subplot(gs[row, col]))
+    
+    history_err = []    # Stockera la norme scalaire (somme des carrés) pour le plot
+    history_params = [] # Stockera les paramètres PHYSIQUES (dénormalisés) pour le plot
+
+    # --- Préparation de la Normalisation pour SciPy ---
+    params0_norm = normalize_params(params0, bounds)
+    bounds_norm = Bounds([0.0]*len(params0), [1.0]*len(params0))
+
+    with h5py.File(h5_file, 'r') as f:
+        def objective_function(params_norm):
+            # 1. Dénormalisation pour retrouver les valeurs physiques
+            params_phys = denormalize_params(params_norm, bounds)
+            
+            print(f"{str(datetime.now())} \nsimu EF n°{len(history_err)}, iteration = {len(history_err)//(len(params_norm)+1)}\nCurrent params (phys): {params_phys}\n")
+            
+            # 2. Calcul des résidus (doit être un vecteur/array 1D pour least_squares)
+            residuals = compute_hill_residuals(domain, V, W, WT, f, params_phys)
+            
+            # 3. Calcul de la norme (scalaire) pour le suivi graphique
+            # least_squares minimise (0.5 * sum(r**2)). On stocke la somme des carrés.
+            error_scalar = np.sum(np.square(residuals))
+            
+            # 4. Stockage pour l'historique
+            history_err.append(error_scalar)
+            history_params.append(params_phys)
+            data_p = np.array(history_params)
+            
+            # 5. Mise à jour graphique (avec les valeurs physiques)
+            # Rafraîchissement estimé à chaque itération de l'optimiseur (Jacobien inclus)
+            if True: #len(history_err) % (len(params_norm) + 1) == 0: 
+                try:
+                    # Plot Erreur (Somme des carrés des résidus)
+                    ax_err.clear()
+                    ax_err.plot(history_err, color='firebrick', lw=1.5)
+                    ax_err.set_yscale('log')
+                    ax_err.set_title("Norme Résidus (Log $\sum r^2$)")
+                    ax_err.grid(True, which="both", ls="-", alpha=0.2)
+
+                    # Plot Paramètres (Physiques)
+                    for i in range(len(params_phys)):
+                        ax_params[i].clear()
+                        ax_params[i].plot(data_p[:, i], color='royalblue')
+                        ax_params[i].set_title(f"{params_names[i]}: {params_phys[i]:.2e}", fontsize=9)
+                        ax_params[i].grid(True, alpha=0.2)
+                    
+                    plt.tight_layout()
+                    plt.pause(0.001)
+                except Exception as e:
+                    # Permet de continuer si la fenêtre est fermée ou s'il y a un souci d'affichage
+                    pass
+                    
+            print(f"Residuals norm (sum of squares): {error_scalar}")
+            
+            # least_squares a STRICTEMENT besoin du vecteur de résidus brut
+            return residuals
+
+        # L'optimiseur reçoit les versions normalisées (0 à 1)
+        result_norm = least_squares(
+            objective_function,
+            params0_norm,
+            method='trf',
+            bounds=bounds_norm,
+            ftol=1e-7, gtol=1e-7, max_nfev=150, verbose=2, x_scale=1, diff_step=1e-3
+        )
+        
+    plt.ioff()
+    plt.show()
+    
+    # --- Post-traitement ---
+    # On reconstruit l'objet résultat pour renvoyer les paramètres physiques optimaux
+    result_phys = result_norm
+    result_phys.x = np.array(denormalize_params(result_norm.x, bounds))
+    
+    return result_phys
+
+
+# if __name__ == "__main__":
+#     bounds_ref_J2 = [
+#         (180000, 220_000),   # E [MPa]
+#         (0.25, 0.35),         # nu 
+#         (10.0, 500.0),        # sigma_Y [MPa]
+#         (20.0, 400.0),         # Q_var [MPa]
+#         (10.0, 1500.0),          # k_hardening
+#     ]
+
+#     domain = load_and_write_mesh("Flat_specimen_refined.msh")
+    
+#     V, W, WT = build_function_spaces(domain)
+#     real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]
+#     from random import uniform,seed
+#     seed(42)  # Pour la reproductibilité
+#     perturbation_percentage = 0.05  # 5% de perturbation aléatoire
+#     normalized_result = normalize_params(real_params, bounds_ref_J2)
+#     normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
+#     parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2)
+#     optimizer_result = femu_res_J2(domain,V, W, WT,"femu_files/non_refined.h5", parameters_disturbed, bounds_ref_J2)
+#     params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
+#     print("Optimized parameters (phys):", optimizer_result.x)
+#     print("normalized error:", [f"{params_names[i]} : {round(abs(optimizer_result.x[i] - real_params[i])/abs(real_params[i])*100,5)}%" for i in range(len(real_params))])
+
+#     # second_round = femu_V3(domain,V, W, WT,"femu_files/non_refined.h5", optimizer_result.x, bounds_ref_J2)
+    
+#     # print("2nd Optimized parameters (phys):", second_round.x)
+#     # print("2ndnormalized error:", [round(abs(second_round.x[i] - real_params[i])/abs(real_params[i])*100,2) for i in range(len(real_params))])
+
+
 if __name__ == "__main__":
-    domain = load_and_write_mesh("Flat_specimen_refined.msh")
+    bounds_ref_hill = [
+        (180000, 220_000),   # E [MPa]
+        (0.25, 0.35),         # nu 
+        (10.0, 500.0),        # sigma_Y [MPa]
+        (20.0, 400.0),         # Q_var [MPa]
+        (10.0, 1500.0),# k_hardening
+        (0.3, 1.3),           # F : Hill, resserré (évite les rapports d'anisotropie > 3)
+        (0.3, 1.3),           # G : Hill, resserré
+        (0.2, 1.0),           # H : Hill, resserré
+        (0.8, 1.8),           # L : cisaillement hors-plan, resserré
+        (0.8, 1.8),           # M : cisaillement hors-plan, resserré
+        (0.6, 1.6),           # N : cisaillement plan, cohérent avec H et resserré          
+    ]
+    params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening", "F", "G", "H", "L", "M", "N"]
+    domain = load_and_write_mesh("carre_trou.msh")
     
     V, W, WT = build_function_spaces(domain)
-    real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]
+    real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.5, 0.5,0.5, 1.5, 1.5, 1.5]
     from random import uniform,seed
     seed(42)  # Pour la reproductibilité
     perturbation_percentage = 0.05  # 5% de perturbation aléatoire
-    normalized_result = normalize_params(real_params, bounds_ref_J2)
+    normalized_result = normalize_params(real_params, bounds_ref_hill)
     normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
-    parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2)
-    optimizer_result = femu_V3(domain,V, W, WT,"femu_files/non_refined.h5", parameters_disturbed, bounds_ref_J2)
+    parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_hill)
+    optimizer_result = femu_res_hill(domain,V, W, WT,"femu_files/carre_trou.h5", parameters_disturbed, bounds_ref_hill,params_names)
     print("Optimized parameters (phys):", optimizer_result.x)
-    print("normalized error:", [abs(optimizer_result.x[i] - real_params[i])/abs(real_params[i]) for i in range(len(real_params))])
+    print("normalized error:", [f"{params_names[i]} : {round(abs(optimizer_result.x[i] - real_params[i])/abs(real_params[i])*100,5)}%" for i in range(len(real_params))])
 
+    # second_round = femu_V3(domain,V, W, WT,"femu_files/non_refined.h5", optimizer_result.x, bounds_ref_J2)
+    
+    # print("2nd Optimized parameters (phys):", second_round.x)
+    # print("2ndnormalized error:", [round(abs(second_round.x[i] - real_params[i])/abs(real_params[i])*100,2) for i in range(len(real_params))])
 

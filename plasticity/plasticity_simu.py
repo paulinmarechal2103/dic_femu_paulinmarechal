@@ -1250,9 +1250,9 @@ if __name__ == "__main__":
         num_steps   = 50,
         load_amp    = 0.01,       # amplitude of the applied displacement
         length      = 10.0,       # half-length of the specimen
-        mesh_file   = "Flat_specimen_refined.msh",
+        mesh_file   = "carre_trou.msh",
         output_dir  = "results_plasticity",
-        file_name    = "non_refined",
+        file_name    = "carre_trou",
         # Elastic constants (used when no model is supplied)
         E           = 200_000.0,
         nu          = 0.3,
