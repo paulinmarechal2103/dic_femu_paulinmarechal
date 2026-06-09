@@ -459,7 +459,7 @@ def project(v, target_func, bcs=None):
 # ===========================================================================
 # Boundary conditions
 # ===========================================================================
-def build_right_facet_tag(domain, coord=0):
+def build_right_facet_tag(domain, coord=1):
     """
     Mark the right-boundary facets (x ≈ +length) with tag 1.
 

@@ -58,7 +58,7 @@ class ElasticModel:
 
 
 class Hill48state():
-    """Internal variables for J2 isotropic hardening."""
+    """Internal variables for hill anisotropic hardening."""
 
     def __init__(self, W, WT):
         self.p_old     = fem.Function(W)   # cumulative plastic strain p
@@ -96,13 +96,57 @@ class Hill48Model(PlasticityModel):
         self.k = k_hardening
 
     # -- internal helpers (UFL) --------------------------------------------
+    def _sigma_hill48(self, sigma):
+        sigma_hill48 = ufl.sqrt(
+            self.F * (sigma[1,1] - sigma[2,2])**2 +
+            self.G * (sigma[2,2] - sigma[0,0])**2 +
+            self.H * (sigma[0,0] - sigma[1,1])**2 + 
+            self.L * (sigma[1,2]**2 + sigma[2,1]**2) + 
+            self.M * (sigma[0,2]**2 + sigma[2,0]**2) + 
+            self.N * (sigma[0,1]**2 + sigma[1,0]**2) + 
+            1e-12 # évite sqrt(0)
+        ) 
+        return sigma_hill48
+    
     def _yield_func(self, sigma, p):
         R = self.Q_var * (1.0 - ufl.exp(-self.k * p))
-        sigma_hill48 = ufl.sqrt(self.F * (sigma[1,1] - sigma[2,2])**2 + self.G * (sigma[2,2] - sigma[0,0])**2 + self.H * (sigma[0,0] - sigma[1,1])**2 + 2.0 * self.L * sigma[1,2]**2 + 2.0 * self.M * sigma[0,2]**2 + 2.0 * self.N * sigma[0,1]**2)
-        return sigma_hill48 - self.sigma_Y - R
+        return self._sigma_hill48(sigma) - self.sigma_Y - R
+
+    def _flow_normal_ufl(self, sigma):
+        """Calcul de la normale avec déclaration explicite de la variable UFL"""
+        s_smeared = sigma + 1e-10 * ufl.Identity(self.elastic.tdim)
+        
+        # On enregistre explicitement le tenseur comme variable UFL
+        s_var = ufl.variable(s_smeared)
+        
+        # On exprime la fonction de Hill à partir de cette variable
+        hill = self._sigma_hill48(s_var)
+        
+        # On dérive par rapport à cette variable spécifique
+        return ufl.diff(hill, s_var)
 
     def _flow_normal(self, sigma):
-        return (3.0 / (2.0 * self.elastic.von_mises(sigma))) * self.elastic.sigma_d(sigma)
+        sig_hill = self._sigma_hill48(sigma) + 1e-10
+        
+        dPhi_00 = 2.0 * self.G * (sigma[0,0] - sigma[2,2]) + 2.0 * self.H * (sigma[0,0] - sigma[1,1])
+        dPhi_11 = 2.0 * self.F * (sigma[1,1] - sigma[2,2]) + 2.0 * self.H * (sigma[1,1] - sigma[0,0])
+        dPhi_22 = 2.0 * self.F * (sigma[2,2] - sigma[1,1]) + 2.0 * self.G * (sigma[2,2] - sigma[0,0])
+        
+        # REMPLACER 4.0 PAR 2.0 ICI :
+        dPhi_01 = 2.0 * self.N * sigma[0,1]
+        dPhi_10 = dPhi_01
+        dPhi_02 = 2.0 * self.M * sigma[0,2]
+        dPhi_20 = dPhi_02
+        dPhi_12 = 2.0 * self.L * sigma[1,2]
+        dPhi_21 = dPhi_12
+        
+        dPhi = ufl.as_tensor([
+            [dPhi_00, dPhi_01, dPhi_02],
+            [dPhi_10, dPhi_11, dPhi_12],
+            [dPhi_20, dPhi_21, dPhi_22]
+        ])
+        
+        return (1.0 / (2.0 * sig_hill)) * dPhi
 
     # -- PlasticityModel interface -----------------------------------------
     def create_state(self, domain, W, WT) -> Hill48state:
@@ -111,15 +155,24 @@ class Hill48Model(PlasticityModel):
     def update(self, state: Hill48state, eps) -> tuple:
         sigma_tr = self.elastic.sigma(eps - state.eps_p_old)
         f_val    = self._yield_func(sigma_tr, state.p_old)
-        n        = self._flow_normal(sigma_tr)
+        
+        # Normale cohérente avec Hill48
+        n = self._flow_normal(sigma_tr)
 
+        # Calcul correct de f_prime pour Hill48 via les modules élastiques généralisés
+        # Pour une convergence stricte, une écriture de Newton-Raphson locale complète est requise.
+        # Approximation locale de la raideur plastique :
         R_prime  = self.Q_var * self.k * ufl.exp(-self.k * state.p_old)
-        f_prime  = -R_prime - 3.0 * self.elastic.mu
-        delta_p0 = -(1.0 / f_prime) * self._yield_func(sigma_tr, state.p_old)
+        
+        E_n = ufl.inner(n, self.elastic.sigma(n))
+        f_prime = -R_prime - E_n
+        
+        delta_p0 = -(1.0 / f_prime) * f_val
 
-        # Active only when the elastic predictor is outside the yield surface
+        # Activation du critère
         delta_eps_p = ufl.conditional(ufl.ge(f_val, 0.0), delta_p0 * n, 0.0 * n)
-        delta_p     = ufl.sqrt(2.0 / 3.0 * ufl.inner(delta_eps_p, delta_eps_p))
+        delta_p     = ufl.conditional(ufl.ge(f_val, 0.0), delta_p0, 0.0)
+        
         return delta_p, delta_eps_p
 
     def commit(self, state: Hill48state, uh) -> None:
@@ -225,7 +278,7 @@ if __name__ == "__main__":
         length      = 10.0,       # half-length of the specimen
         mesh_file   = "carre_trou.msh",
         output_dir  = "results_plasticity",
-        file_name    = "carre_trou",
+        file_name    = "carre_trou_anisotrope_analitique",
         # Elastic constants (used when no model is supplied)
         E           = 200_000.0,
         nu          = 0.3,
@@ -233,12 +286,33 @@ if __name__ == "__main__":
         sigma_Y     = 100.0,
         Q_var       = 50.0,
         k_hardening = 1000.0,
+        F = 0.900,  # Anisotropie dans le plan transverse
+        G = 0.600,  # Anisotropie dans le plan longitudinal
+        H = 0.400,  # Terme d'interaction (souvent proche
+        L = 1.7,  # Cisaillement hors-plan (souvent supposé isotrope = 1.5)
+        M = 1.3,  # Cisaillement hors-plan (souvent supposé isotrope = 1.5)
+        N = 1.350
     )
-
+    modèle_hill48 = Hill48Model(
+        elastic=ElasticModel(config["E"], config["nu"], tdim=3),
+        sigma_Y=config["sigma_Y"],
+        H=config["H"],
+        F=config["F"],
+        G=config["G"],
+        L=config["L"],
+        M=config["M"],
+        N=config["N"],
+        Q_var=config["Q_var"],
+        k_hardening=config["k_hardening"]
+    )
     domain = load_and_write_mesh(config["mesh_file"])
 
     V, W, WT = build_function_spaces(domain)
-    forces, _ = run_simulation_V3(domain,V,W,WT,config=config)
+    from time import time
+    start_time = time()
+    forces, _ = run_simulation_V3(domain,V,W,WT,config=config, model=modèle_hill48)
+    end_time = time()
+    print(f"Simulation completed in {end_time - start_time:.2f} seconds.")
     print("pas de soucis la team")
     plt.figure()
     plt.plot(forces)
