@@ -829,8 +829,7 @@ def femu_res_hill(
             # 1. Dénormalisation pour retrouver les valeurs physiques
             params_phys = denormalize_params(params_norm, bounds)
             
-            print(f"{str(datetime.now())} \nsimu EF n°{len(history_err)}, iteration = {len(history_err)//(len(params_norm)+1)}\nCurrent params (phys): {[f"{params_names[i]}: {params_phys[i]:.5e}" for i in range(len(params_phys))]}\n")
-            
+            print(f"{str(datetime.now())} \nsimu EF n°{len(history_err)}, iteration = {len(history_err)//(len(params_norm)+1)}\nCurrent params (phys): {[f'{params_names[i]}: {params_phys[i]:.2e}' for i in range(len(params_phys))]}\n")
             # 2. Calcul des résidus (doit être un vecteur/array 1D pour least_squares)
             residuals = compute_hill_residuals(domain, V, W, WT, f, params_phys)
             
@@ -892,61 +891,61 @@ def femu_res_hill(
     return result_phys
 
 
+if __name__ == "__main__":
+    bounds_ref_J2_centr= [
+        (199000, 201_000),   # E [MPa]
+        (0.25, 0.35),         # nu 
+        (10.0, 500.0),        # sigma_Y [MPa]
+        (20.0, 400.0),         # Q_var [MPa]
+        (10.0, 1500.0),          # k_hardening
+    ]
+
+    domain = load_and_write_mesh("Flat_specimen_refined.msh")
+    
+    V, W, WT = build_function_spaces(domain)
+    real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]
+    from random import uniform,seed
+    seed(42)  # Pour la reproductibilité
+    perturbation_percentage = 0.05  # 5% de perturbation aléatoire
+    normalized_result = normalize_params(real_params, bounds_ref_J2_centr)
+    normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
+    parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2_centr)
+    optimizer_result = femu_res_J2(domain,V, W, WT,"femu_files/non_refined.h5", parameters_disturbed, bounds_ref_J2_centr)
+    params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
+    print("Optimized parameters (phys):", optimizer_result.x)
+    print("normalized error:", [f"{params_names[i]} : {round(abs(optimizer_result.x[i] - real_params[i])/abs(real_params[i])*100,5)}%" for i in range(len(real_params))])
+
+    # second_round = femu_V3(domain,V, W, WT,"femu_files/non_refined.h5", optimizer_result.x, bounds_ref_J2)
+    
+    # print("2nd Optimized parameters (phys):", second_round.x)
+    # print("2ndnormalized error:", [round(abs(second_round.x[i] - real_params[i])/abs(real_params[i])*100,2) for i in range(len(real_params))])
+
+
 # if __name__ == "__main__":
-#     bounds_ref_J2 = [
+#     bounds_ref_hill = [
 #         (180000, 220_000),   # E [MPa]
 #         (0.25, 0.35),         # nu 
 #         (10.0, 500.0),        # sigma_Y [MPa]
 #         (20.0, 400.0),         # Q_var [MPa]
-#         (10.0, 1500.0),          # k_hardening
+#         (10.0, 1500.0),# k_hardening
+#         (0.3, 1.3),           # F : Hill
+#         (0.3, 1.3),           # G : Hill
+#         (0.2, 1.0),           # H : Hill
+#         (0.8, 1.8),           # L : cisaillement hors-plan
+#         (0.8, 1.8),           # M : cisaillement hors-plan
+#         (0.6, 1.6),           # N : cisaillement plan      
 #     ]
-
-#     domain = load_and_write_mesh("Flat_specimen_refined.msh")
+#     params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening", "F", "G", "H", "L", "M", "N"]
+#     domain = load_and_write_mesh("carre_trou.msh")
     
 #     V, W, WT = build_function_spaces(domain)
-#     real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]
+#     real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.9, 0.6,0.4, 1.7, 1.3, 1.35]
 #     from random import uniform,seed
 #     seed(42)  # Pour la reproductibilité
 #     perturbation_percentage = 0.05  # 5% de perturbation aléatoire
-#     normalized_result = normalize_params(real_params, bounds_ref_J2)
+#     normalized_result = normalize_params(real_params, bounds_ref_hill)
 #     normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
-#     parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2)
-#     optimizer_result = femu_res_J2(domain,V, W, WT,"femu_files/non_refined.h5", parameters_disturbed, bounds_ref_J2)
-#     params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
+#     parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_hill)
+#     optimizer_result = femu_res_hill(domain,V, W, WT,"femu_files/carre_trou_anisotrope_analitique.h5", parameters_disturbed, bounds_ref_hill,params_names)
 #     print("Optimized parameters (phys):", optimizer_result.x)
 #     print("normalized error:", [f"{params_names[i]} : {round(abs(optimizer_result.x[i] - real_params[i])/abs(real_params[i])*100,5)}%" for i in range(len(real_params))])
-
-#     # second_round = femu_V3(domain,V, W, WT,"femu_files/non_refined.h5", optimizer_result.x, bounds_ref_J2)
-    
-#     # print("2nd Optimized parameters (phys):", second_round.x)
-#     # print("2ndnormalized error:", [round(abs(second_round.x[i] - real_params[i])/abs(real_params[i])*100,2) for i in range(len(real_params))])
-
-
-if __name__ == "__main__":
-    bounds_ref_hill = [
-        (180000, 220_000),   # E [MPa]
-        (0.25, 0.35),         # nu 
-        (10.0, 500.0),        # sigma_Y [MPa]
-        (20.0, 400.0),         # Q_var [MPa]
-        (10.0, 1500.0),# k_hardening
-        (0.3, 1.3),           # F : Hill
-        (0.3, 1.3),           # G : Hill
-        (0.2, 1.0),           # H : Hill
-        (0.8, 1.8),           # L : cisaillement hors-plan
-        (0.8, 1.8),           # M : cisaillement hors-plan
-        (0.6, 1.6),           # N : cisaillement plan      
-    ]
-    params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening", "F", "G", "H", "L", "M", "N"]
-    domain = load_and_write_mesh("carre_trou.msh")
-    
-    V, W, WT = build_function_spaces(domain)
-    real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.9, 0.6,0.4, 1.7, 1.3, 1.35]
-    from random import uniform,seed
-    seed(42)  # Pour la reproductibilité
-    perturbation_percentage = 0.05  # 5% de perturbation aléatoire
-    normalized_result = normalize_params(real_params, bounds_ref_hill)
-    normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
-    parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_hill)
-    optimizer_result = femu_res_hill(domain,V, W, WT,"femu_files/carre_trou_anisotrope_analitique.h5", parameters_disturbed, bounds_ref_hill,params_names)
-    print("Optimized parameters (phys):", optimizer_result.x)
-    print("normalized error:", [f"{params_names[i]} : {round(abs(optimizer_result.x[i] - real_params[i])/abs(real_params[i])*100,5)}%" for i in range(len(real_params))])

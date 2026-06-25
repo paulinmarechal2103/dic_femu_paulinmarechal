@@ -15,47 +15,6 @@ from dolfinx.fem.petsc import NewtonSolverNonlinearProblem
 from dolfinx.nls.petsc import NewtonSolver
 
 
-class ElasticModel:
-    """
-    Linear-elastic constitutive model.
-
-    Stores Lamé constants and exposes UFL expression builders.
-    Shared by all plasticity models that need a linear-elastic predictor.
-
-    Parameters
-    ----------
-    E    : float – Young's modulus
-    nu   : float – Poisson ratio
-    tdim : int   – spatial dimension of the mesh
-    """
-
-    def __init__(self, E: float, nu: float, tdim: int):
-        self.E    = E
-        self.nu   = nu
-        self.tdim = tdim
-        self.mu   = E / (2.0 * (1.0 + nu))
-        self.lam  = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu))
-
-    def epsilon(self, v):
-        """Symmetric gradient – linearised strain tensor ε(v)."""
-        return 0.5 * (ufl.grad(v) + ufl.grad(v).T)
-
-    def sigma(self, eps):
-        """Cauchy stress for a given strain (Hooke's law)."""
-        return (
-            self.lam * ufl.tr(eps) * ufl.Identity(self.tdim)
-            + 2.0 * self.mu * eps
-        )
-
-    def sigma_d(self, s):
-        """Deviatoric part of a stress (or any symmetric tensor)."""
-        return s - (1.0 / 3.0) * ufl.tr(s) * ufl.Identity(self.tdim)
-
-    def von_mises(self, s):
-        """von Mises equivalent stress  J = sqrt(3/2 · s_d : s_d)."""
-        return ufl.sqrt(1.5 * ufl.inner(self.sigma_d(s), self.sigma_d(s)))
-
-
 
 class Hill48state():
     """Internal variables for hill anisotropic hardening."""
@@ -72,7 +31,7 @@ class Hill48Model(PlasticityModel):
 
     σ_hill48(σ) = sqrt(F(σ_22 - σ_33)² + G(σ_33 - σ_11)² + H(σ_11 - σ_22)² + 2Lσ_23² + 2Mσ_13² + 2Nσ_12²))
     Yield function:   f(σ, p) = σ_hill49(σ) – σ_Y – Q·(1 – exp(–k·p))
-    Flow rule:        Δεᵖ = Δp · n,   n = (3/2) σ_d / J(σ)
+    Flow rule:        Δεᵖ = Δp · n,   n = ∂σ_hill48/∂σ
     Return mapping:   one linearised Newton step
 
     Parameters
@@ -132,13 +91,12 @@ class Hill48Model(PlasticityModel):
         dPhi_11 = 2.0 * self.F * (sigma[1,1] - sigma[2,2]) + 2.0 * self.H * (sigma[1,1] - sigma[0,0])
         dPhi_22 = 2.0 * self.F * (sigma[2,2] - sigma[1,1]) + 2.0 * self.G * (sigma[2,2] - sigma[0,0])
         
-        # REMPLACER 4.0 PAR 2.0 ICI :
         dPhi_01 = 2.0 * self.N * sigma[0,1]
-        dPhi_10 = dPhi_01
+        dPhi_10 = 2.0 * self.N * sigma[1,0]
         dPhi_02 = 2.0 * self.M * sigma[0,2]
-        dPhi_20 = dPhi_02
+        dPhi_20 = 2.0 * self.M * sigma[2,0]
         dPhi_12 = 2.0 * self.L * sigma[1,2]
-        dPhi_21 = dPhi_12
+        dPhi_21 = 2.0 * self.L * sigma[2,1]
         
         dPhi = ufl.as_tensor([
             [dPhi_00, dPhi_01, dPhi_02],

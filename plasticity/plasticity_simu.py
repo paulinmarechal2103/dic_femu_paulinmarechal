@@ -71,7 +71,7 @@ DEFAULT_CONFIG = dict(
     # J2 isotropic hardening parameters (used when no model is supplied)
     sigma_Y     = 100.0,
     Q_var       = 50.0,
-    k_hardening = 10.0,
+    k_hardening = 1000.0,
 )
 
 # config_test = dict(
@@ -590,362 +590,8 @@ def build_solver(domain, V, model: PlasticityModel, state: PlasticState, bcs,
     return uh, problem, solver
 
 
-# ===========================================================================
-# Main simulation loop
-# ===========================================================================
-def run_simulation(config=None, model: PlasticityModel = None):
-    """
-    Run the elasto-plastic simulation.
 
-    Parameters
-    ----------
-    config : dict            – keys from DEFAULT_CONFIG to override
-    model  : PlasticityModel – plasticity model to use.
-             Defaults to J2IsotropicHardening built from config values.
-
-    Returns
-    -------
-    force_vec : list of float – reaction force at the right boundary per step
-    """
-    cfg       = {**DEFAULT_CONFIG, **(config or {})}
-    t         = cfg["t_start"]
-    num_steps = cfg["num_steps"]
-    dt        = (cfg["T"] - t) / num_steps
-    load_amp  = cfg["load_amp"]
-    length    = cfg["length"]
-
-    # ------------------------------------------------------------------ mesh
-    domain = load_and_write_mesh(cfg["mesh_file"])
-    #print("Mesh topology dim:", domain.topology.dim)
-
-    # ---------------------------------------------------------- output file
-    os.system(f"rm -rf {cfg['output_dir']}")
-    fic = io.XDMFFile(domain.comm, f"{cfg['output_dir']}/{cfg['file_name']}.xdmf", "w")
-    fic.write_mesh(domain)
-
-    # -------------------------------------------------------- function spaces
-    V, W, WT = build_function_spaces(domain)
-
-    # ------------------------------------------------------- plasticity model
-    if model is None:
-        elastic = ElasticModel(E=cfg["E"], nu=cfg["nu"], tdim=domain.topology.dim)
-        model   = J2IsotropicHardening(
-            elastic, sigma_Y=cfg["sigma_Y"], Q_var=cfg["Q_var"], k=cfg["k_hardening"]
-        )
-
-    state = model.create_state(domain, W, WT)
-
-    # ---------------------------------------------------------- BCs + solver
-    disp_value          = np.array((load_amp, 0.1 * load_amp, 0), dtype=PETSc.ScalarType)
-    bcs                 = dirichlet_bcs(domain, V, disp_value, length)
-    uh, problem, solver = build_solver(domain, V, model, state, bcs)
-    ds                  = build_right_facet_tag(domain, length)
-
-    # ------------------------------------------------------------ time loop
-    force_vec  = []
-    t_paraview = 0
-    displ_val  = []
-
-
-    opts = PETSc.Options()
-    opts["ksp_monitor"] = None
-    opts["snes_monitor"] = None
-    log.set_log_level(log.LogLevel.ERROR)
-
-
-    for step in range(num_steps + 1):
-        #print(f"--- Step {step} ---")
-        t          += dt
-        bcs         = dirichlet_bcs(domain, V, disp_value * t, length)
-        problem.bcs = bcs
-        #print("  disp_value * t =", disp_value * t)
-
-        #log.set_log_level(log.LogLevel.INFO)
-       
-        solver.solve(uh)
-        #log.set_log_level(log.LogLevel.WARNING)
-
-        eps                  = model.elastic.epsilon(uh)
-        delta_p, delta_eps_p = model.update(state, eps)
-
-        # Displacement
-        uh.name = "displacement"
-        fic.write_function(uh, t_paraview)
-        current_displ = uh.x.array.copy()
-        displ_val.append(current_displ)
-
-        # Total strain
-        eps_proj = fem.Function(WT)
-        eps_proj.interpolate(fem.Expression(eps, WT.element.interpolation_points))
-        eps_proj.name = "Epsilon"
-        fic.write_function(eps_proj, t_paraview)
-
-        # Plastic strain  εᵖ = εᵖ_old + Δεᵖ
-        eps_p_proj = fem.Function(WT)
-        eps_p_proj.interpolate(
-            fem.Expression(delta_eps_p + state.eps_p_old, WT.element.interpolation_points)
-        )
-        eps_p_proj.name = "Epsilon_p"
-        fic.write_function(eps_p_proj, t_paraview)
-
-        # Cumulative plastic strain  p = p_old + Δp
-        p_proj = fem.Function(W)
-        p_proj.interpolate(
-            fem.Expression(delta_p + state.p_old, W.element.interpolation_points)
-        )
-        p_proj.name = "Cumulative plastic strain"
-        fic.write_function(p_proj, t_paraview)
-
-        # Von Mises stress
-        stress  = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
-        vm_proj = fem.Function(W)
-        vm_proj.interpolate(
-            fem.Expression(model.elastic.von_mises(stress), W.element.interpolation_points)
-        )
-        vm_proj.name = "Von Mises stress"
-        fic.write_function(vm_proj, t_paraview)
-
-        # Reaction force
-        force = fem.assemble_scalar(fem.form(stress[0, 0] * ds(1)))
-        force_vec.append(force)
-        #print("  Reaction force:", force)
-
-        # Debug: cumulative plastic strain increment error
-        p_incr_proj = fem.Function(W)
-        p_incr_proj.interpolate(
-            fem.Expression(delta_eps_p[0, 0] - delta_p, W.element.interpolation_points)
-        )
-        p_incr_proj.name = "Cumulative plastic increment error"
-        fic.write_function(p_incr_proj, t_paraview)
-
-        # Debug: cumulated plastic error
-        p_tot_proj = fem.Function(W)
-        p_tot_proj.interpolate(
-            fem.Expression(
-                (state.eps_p_old[0, 0] + delta_eps_p[0, 0]) - (state.p_old + delta_p),
-                W.element.interpolation_points,
-            )
-        )
-        p_tot_proj.name = "Cumulated plastic error"
-        fic.write_function(p_tot_proj, t_paraview)
-
-        #Calcul du tenseur des contraintes (déjà dans votre code)
-        stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
-
-        #Définition des composantes à extraire (Indices i, j et nom)
-        components = {
-            "sigma_xx": (0, 0),
-            "sigma_yy": (1, 1),
-            "sigma_zz": (2, 2),
-            "sigma_xy": (0, 1),
-            "sigma_xz": (0, 2),
-            "sigma_yz": (1, 2)
-        }
-
-        # Boucle d'extraction et d'écriture
-        for name, indices in components.items():
-            i, j = indices
-            s_comp = fem.Function(W)
-            s_comp.name = name
-            # Extraction de la composante (i, j) du tenseur stress
-            s_comp.interpolate(fem.Expression(stress[i, j], W.element.interpolation_points))
-            fic.write_function(s_comp, t_paraview)
-
-        # Pression hydrostatique
-        pression = fem.Function(W)
-        pression.name = "Pressure"
-        pression.interpolate(fem.Expression(-1.0/3.0 * ufl.tr(stress), W.element.interpolation_points))
-        fic.write_function(pression, t_paraview)
-
-        # Advance internal variables to tₙ₊₁
-        model.commit(state, uh)
-
-        t_paraview += 1
-        #print("  t_paraview =", t_paraview)
-
-    fic.close()
-    #print("Simulation complete.")
-    #print("Reaction forces:", force_vec)
-    return force_vec, displ_val
-
-
-
-# ===========================================================================
-# Main simulation loop -------- V2 -------
-# ===========================================================================
-def run_simulation_V2(config=None, model: PlasticityModel = None, write_output: bool = True):
-    """
-    Run the elasto-plastic simulation.
-
-    Parameters
-    ----------
-    config : dict            – keys from DEFAULT_CONFIG to override
-    model  : PlasticityModel – plasticity model to use.
-             Defaults to J2IsotropicHardening built from config values.
-    write_output : bool      – if False, skips all XDMF I/O and field projections
-                               for maximum speed during FEMU/optimization loops.
-
-    Returns
-    -------
-    force_vec : list of float – reaction force at the right boundary per step
-    displ_val : list of np.ndarray – displacement vector per step
-    """
-    cfg       = {**DEFAULT_CONFIG, **(config or {})}
-    t         = cfg["t_start"]
-    num_steps = cfg["num_steps"]
-    dt        = (cfg["T"] - t) / num_steps
-    load_amp  = cfg["load_amp"]
-    length    = cfg["length"]
-
-    # ------------------------------------------------------------------ mesh
-    domain = load_and_write_mesh(cfg["mesh_file"])
-
-    # ---------------------------------------------------------- output file
-    fic = None
-    if write_output:
-        os.system(f"rm -rf {cfg['output_dir']}")
-        fic = io.XDMFFile(domain.comm, f"{cfg['output_dir']}/{cfg['file_name']}.xdmf", "w")
-        fic.write_mesh(domain)
-
-    # -------------------------------------------------------- function spaces
-    V, W, WT = build_function_spaces(domain)
-
-    # ------------------------------------------------------- plasticity model
-    if model is None:
-        elastic = ElasticModel(E=cfg["E"], nu=cfg["nu"], tdim=domain.topology.dim)
-        model   = J2IsotropicHardening(
-            elastic, sigma_Y=cfg["sigma_Y"], Q_var=cfg["Q_var"], k=cfg["k_hardening"]
-        )
-
-    state = model.create_state(domain, W, WT)
-
-    # ---------------------------------------------------------- BCs + solver
-    disp_value          = np.array((load_amp, 0.1 * load_amp, 0), dtype=PETSc.ScalarType)
-    bcs                 = dirichlet_bcs(domain, V, disp_value, length)
-    uh, problem, solver = build_solver(domain, V, model, state, bcs)
-    ds                  = build_right_facet_tag(domain, length)
-
-    # ------------------------------------------------------------ time loop
-    force_vec  = []
-    displ_val  = []
-    t_paraview = 0
-
-    # Silence PETSc/SNES logs for cleaner FEMU output
-    opts = PETSc.Options()
-    opts["ksp_monitor"] = None
-    opts["snes_monitor"] = None
-    log.set_log_level(log.LogLevel.ERROR)
-
-    for step in range(num_steps + 1):
-        t          += dt
-        bcs         = dirichlet_bcs(domain, V, disp_value * t, length)
-        problem.bcs = bcs
-
-        solver.solve(uh)
-
-        # --- Calculs physiques essentiels (toujours exécutés) ---
-        eps                  = model.elastic.epsilon(uh)
-        delta_p, delta_eps_p = model.update(state, eps)
-
-        # Stockage du déplacement
-        current_displ = uh.x.array.copy()
-        displ_val.append(current_displ)
-
-        # Contrainte & Force de réaction
-        stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
-        force  = fem.assemble_scalar(fem.form(stress[0, 0] * ds(1)))
-        force_vec.append(force)
-
-        # --------------------------------------------------------------
-        # Projections & E/S Paraview (uniquement si write_output=True)
-        # --------------------------------------------------------------
-        if write_output and fic is not None:
-            uh.name = "displacement"
-            fic.write_function(uh, t_paraview)
-
-            # Total strain
-            eps_proj = fem.Function(WT)
-            eps_proj.interpolate(fem.Expression(eps, WT.element.interpolation_points))
-            eps_proj.name = "Epsilon"
-            fic.write_function(eps_proj, t_paraview)
-
-            # Plastic strain
-            eps_p_proj = fem.Function(WT)
-            eps_p_proj.interpolate(
-                fem.Expression(delta_eps_p + state.eps_p_old, WT.element.interpolation_points)
-            )
-            eps_p_proj.name = "Epsilon_p"
-            fic.write_function(eps_p_proj, t_paraview)
-
-            # Cumulative plastic strain
-            p_proj = fem.Function(W)
-            p_proj.interpolate(
-                fem.Expression(delta_p + state.p_old, W.element.interpolation_points)
-            )
-            p_proj.name = "Cumulative plastic strain"
-            fic.write_function(p_proj, t_paraview)
-
-            # Von Mises stress
-            vm_proj = fem.Function(W)
-            vm_proj.interpolate(
-                fem.Expression(model.elastic.von_mises(stress), W.element.interpolation_points)
-            )
-            vm_proj.name = "Von Mises stress"
-            fic.write_function(vm_proj, t_paraview)
-
-            # Debug: cumulative plastic strain increment error
-            p_incr_proj = fem.Function(W)
-            p_incr_proj.interpolate(
-                fem.Expression(delta_eps_p[0, 0] - delta_p, W.element.interpolation_points)
-            )
-            p_incr_proj.name = "Cumulative plastic increment error"
-            fic.write_function(p_incr_proj, t_paraview)
-
-            # Debug: cumulated plastic error
-            p_tot_proj = fem.Function(W)
-            p_tot_proj.interpolate(
-                fem.Expression(
-                    (state.eps_p_old[0, 0] + delta_eps_p[0, 0]) - (state.p_old + delta_p),
-                    W.element.interpolation_points,
-                )
-            )
-            p_tot_proj.name = "Cumulated plastic error"
-            fic.write_function(p_tot_proj, t_paraview)
-
-            # Stress components
-            components = {
-                "sigma_xx": (0, 0), "sigma_yy": (1, 1), "sigma_zz": (2, 2),
-                "sigma_xy": (0, 1), "sigma_xz": (0, 2), "sigma_yz": (1, 2)
-            }
-            for name, (i, j) in components.items():
-                s_comp = fem.Function(W)
-                s_comp.name = name
-                s_comp.interpolate(fem.Expression(stress[i, j], W.element.interpolation_points))
-                fic.write_function(s_comp, t_paraview)
-
-            # Hydrostatic pressure
-            pression = fem.Function(W)
-            pression.name = "Pressure"
-            pression.interpolate(fem.Expression(-1.0/3.0 * ufl.tr(stress), W.element.interpolation_points))
-            fic.write_function(pression, t_paraview)
-
-            t_paraview += 1
-
-        # Advance internal variables to tₙ₊₁
-        model.commit(state, uh)
-
-    if fic is not None:
-        fic.close()
-
-    return force_vec, displ_val
-
-
-# domain = load_and_write_mesh("Flat_specimen_refined.msh")
-
-# V, W, WT = build_function_spaces(domain)
-
-
-def run_simulation_V3(domain,V,W,WT,config=None, coord = 1, model: PlasticityModel = None, write_output: bool = True):
+def run_simulation_V3(domain,V,W,WT,config=None, coord = 1, model: PlasticityModel = None):
     """
     Run the elasto-plastic simulation.
 
@@ -1025,6 +671,118 @@ def run_simulation_V3(domain,V,W,WT,config=None, coord = 1, model: PlasticityMod
         else:
             # En 3D, on donne (u_x, u_y, u_z)
             bcs = dirichlet_bcs(domain, V, disp_value * t, length)
+
+        
+        problem.bcs = bcs
+
+        solver.solve(uh)
+
+        # --- Calculs physiques essentiels (toujours exécutés) ---
+        eps                  = model.elastic.epsilon(uh)
+        delta_p, delta_eps_p = model.update(state, eps)
+
+        # Stockage du déplacement
+        current_displ = uh.x.array.copy()
+        displ_val.append(current_displ)
+
+        # Contrainte & Force de réaction
+        stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
+        force  = fem.assemble_scalar(fem.form(stress[1, 1] * ds(1)))
+        force_vec.append(force)
+
+
+        # Advance internal variables to tₙ₊₁
+        model.commit(state, uh)
+
+    if fic is not None:
+        fic.close()
+
+    return force_vec, displ_val
+
+
+
+def run_simulation_relax(domain,V,W,WT,config=None, coord = 1, model: PlasticityModel = None, num_supp_steps: int = 50):
+    """
+    Run the elasto-plastic simulation.
+
+    Parameters
+    ----------
+    config : dict            – keys from DEFAULT_CONFIG to override
+    model  : PlasticityModel – plasticity model to use.
+             Defaults to J2IsotropicHardening built from config values.
+
+    Returns
+    -------
+    force_vec : list of float – reaction force at the right boundary per step
+    displ_val : list of np.ndarray – displacement vector per step
+    """
+    cfg       = {**DEFAULT_CONFIG, **(config or {})}
+    t         = cfg["t_start"]
+    num_steps = cfg["num_steps"]
+    dt        = (cfg["T"] - t) / num_steps
+    load_amp  = cfg["load_amp"]
+    length    = cfg["length"]
+    ds = build_right_facet_tag(domain, coord)
+    # ------------------------------------------------------------------ mesh
+
+    # ---------------------------------------------------------- output file
+    fic = None
+
+
+    # -------------------------------------------------------- function spaces
+
+    # ------------------------------------------------------- plasticity model
+    if model is None:
+        elastic = ElasticModel(E=cfg["E"], nu=cfg["nu"], tdim=domain.topology.dim)
+        model   = J2IsotropicHardening(
+            elastic, sigma_Y=cfg["sigma_Y"], Q_var=cfg["Q_var"], k=cfg["k_hardening"]
+        )
+
+    state = model.create_state(domain, W, WT)
+
+    # ---------------------------------------------------------- BCs + solver
+    gdim = domain.geometry.dim
+        
+    if gdim == 2:
+        # En 2D, on ne donne que (u_x, u_y)
+        disp_value = np.array((0.1 * load_amp, load_amp), dtype=PETSc.ScalarType)
+        left_disp_const  = fem.Constant(domain, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+        right_disp_const = fem.Constant(domain, np.array([0.0, 0.0], dtype=PETSc.ScalarType))
+        bcs = dirichlet_bcs_tensile(domain, V, left_disp_const, right_disp_const,coord)
+    else:
+        # En 3D, on donne (u_x, u_y, u_z)
+        disp_value = np.array((0.1 * load_amp, load_amp, 0.0), dtype=PETSc.ScalarType)
+        bcs = dirichlet_bcs(domain, V, disp_value, length)
+    
+    uh, problem, solver = build_solver(domain, V, model, state, bcs)
+    ds                  = build_right_facet_tag(domain, coord)
+
+    # ------------------------------------------------------------ time loop
+    force_vec  = []
+    displ_val  = []
+    t_paraview = 0
+
+    # Silence PETSc/SNES logs for cleaner FEMU output
+    opts = PETSc.Options()
+    opts["ksp_monitor"] = None
+    opts["snes_monitor"] = None
+    log.set_log_level(log.LogLevel.ERROR)
+
+    for step in range(num_steps + 1 + num_supp_steps):
+        t          += dt
+        if step<= num_steps:
+            disp_t = disp_value[1] * t
+
+            if gdim == 2:
+                # En 2D, on ne donne que (u_x, u_y)
+                left_disp_const.value  = np.array([0.0, -disp_t], dtype=PETSc.ScalarType)
+                right_disp_const.value = np.array([0.0, disp_t], dtype=PETSc.ScalarType)
+            else:
+                # En 3D, on donne (u_x, u_y, u_z)
+                bcs = dirichlet_bcs(domain, V, disp_value * t, length)
+        else:
+            pass
+
 
         
         problem.bcs = bcs
@@ -1250,7 +1008,7 @@ if __name__ == "__main__":
         num_steps   = 50,
         load_amp    = 0.01,       # amplitude of the applied displacement
         length      = 10.0,       # half-length of the specimen
-        mesh_file   = "carre_trou.msh",
+        mesh_file   = "Flat_specimen_refined.msh",
         output_dir  = "results_plasticity",
         file_name    = "carre_trou",
         # Elastic constants (used when no model is supplied)
@@ -1265,7 +1023,7 @@ if __name__ == "__main__":
     domain = load_and_write_mesh(config["mesh_file"])
 
     V, W, WT = build_function_spaces(domain)
-    forces, _ = run_simulation_write(domain,V,W,WT,config=config)
+    forces, _ = run_simulation_relax(domain,V,W,WT,config=config)
     print("pas de soucis la team")
     plt.figure()
     plt.plot(forces)

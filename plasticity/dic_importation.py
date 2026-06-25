@@ -6,6 +6,14 @@ import dolfinx.fem as fem
 import dolfinx.io
 from mpi4py import MPI
 from numpy.typing import NDArray
+from plasticity_simu import load_and_write_mesh
+from image_calibration import calibrate_2d_manual,check_calibration_2d
+import os
+import ufl
+import skimage
+import h5py
+import basix
+from scipy.interpolate import interp1d
 
 # =========================================================================
 # 1. CONVERSION ET TRIANGULATION NETTOYÉE
@@ -23,8 +31,8 @@ def csv_to_fenicsx_xdmf(csv_file: str, xdmf_path: str, alpha: float = 0.2) -> No
     # Masque de filtrage : points bien corrélés (u != 0 et non NaN)
     valid_mask = (d["u"] != 0) & (~np.isnan(d["u"]))
     
-    x_coords = d["x_c"][valid_mask]
-    y_coords = d["y_c"][valid_mask]
+    x_coords = d["x"][valid_mask]
+    y_coords = d["y"][valid_mask]
     u_values = d["u"][valid_mask]
     v_values = d["v"][valid_mask]
 
@@ -55,8 +63,8 @@ def csv_to_fenicsx_xdmf(csv_file: str, xdmf_path: str, alpha: float = 0.2) -> No
         points=points,
         cells=[("triangle", triangles)],
         point_data={
-            "x_c": x_values_2d, # Position X initiale de la DIC rattachée au point
-            "y_c": y_values_2d, # Position Y initiale de la DIC rattachée au point
+            "x": x_values_2d, # Position X initiale de la DIC rattachée au point
+            "y": y_values_2d, # Position Y initiale de la DIC rattachée au point
             "u": u_values_2d,
             "v": v_values_2d,
         }
@@ -209,11 +217,11 @@ def create_reference_mesh_from_csv(csv_file: str, alpha: float = 20.0):
     # Filtrage des points valides au pas 1 (déplacement non nul et non NaN)
     valid_mask = (d["sigma"] != -1)
     
-    ref_x = np.round(d["x_c"][valid_mask], 4)
-    ref_y = np.round(d["y_c"][valid_mask], 4)
+    ref_x = np.round(d["x"][valid_mask], 4)
+    ref_y = np.round(d["y"][valid_mask], 4)
     REFERENCE_COORDS = list(zip(ref_x, ref_y))
     
-    points = np.stack([d["x_c"][valid_mask], d["y_c"][valid_mask], np.zeros_like(d["x_c"][valid_mask])], axis=-1)
+    points = np.stack([d["x"][valid_mask], d["y"][valid_mask], np.zeros_like(d["x"][valid_mask])], axis=-1)
     
     # Triangulation PyVista
     cloud = pv.PolyData(points)
@@ -255,8 +263,8 @@ def update_displacement_field(csv_file: str, mesh_dolfinx, u_obs):
     names = [s.replace('"', "").replace(" ", "") for s in data.columns]
     d = {names[i]: data.values[:, i] for i in range(len(names))}
 
-    current_x = np.round(d["x_c"], 4)
-    current_y = np.round(d["y_c"], 4)
+    current_x = np.round(d["x"], 4)
+    current_y = np.round(d["y"], 4)
     
     current_data_map = {
         (cx, cy): (cu, cv) for cx, cy, cu, cv in zip(current_x, current_y, d["u"], d["v"])
@@ -314,7 +322,7 @@ def update_displacement_field_2(csv_file: str, mesh_dolfinx, u_obs, k: int = 3):
         u_values = np.zeros(len(REFERENCE_COORDS))
         v_values = np.zeros(len(REFERENCE_COORDS))
     else:
-        valid_coords = np.stack([d["x_c"][valid_mask], d["y_c"][valid_mask]], axis=-1)
+        valid_coords = np.stack([d["x"][valid_mask], d["y"][valid_mask]], axis=-1)
         valid_u = u_curr[valid_mask]
         valid_v = v_curr[valid_mask]
 
@@ -391,7 +399,7 @@ def update_strain_field_from_csv(csv_file: str, mesh_dolfinx, E_obs, k: int = 3)
         eyy_values = np.zeros(len(REFERENCE_COORDS))
         exy_values = np.zeros(len(REFERENCE_COORDS))
     else:
-        valid_coords = np.stack([d["x_c"][valid_mask], d["y_c"][valid_mask]], axis=-1)
+        valid_coords = np.stack([d["x"][valid_mask], d["y"][valid_mask]], axis=-1)
         valid_exx = exx_curr[valid_mask]
         valid_eyy = eyy_curr[valid_mask]
         valid_exy = exy_curr[valid_mask]
@@ -635,15 +643,384 @@ def process_csv_series_fenicsx(folder_path: str, output_xdmf: str, file_prefix: 
 
     print(f"[Succès] Série temporelle complète générée avec dolfinx dans : {output_xdmf}")
 
-# =========================================================================
-# EXÉCUTION
-# =========================================================================
-if __name__ == "__main__":
-    dossier_csv = "/home/pmarechal/Documents/DP_N_E/images_and_csv"
-    
-    process_csv_series_fenicsx(
-        folder_path=dossier_csv, 
-        output_xdmf="dic_series_complete.xdmf", 
-        file_prefix="N_E_basler_", 
-        alpha=20.0
+
+def interpolate_displacement_obs_mesh_to_cad_mesh_2D(
+    u_obs: fem.Function, u_cad: fem.Function, tform_cad_to_img_4D: NDArray
+) -> None:
+    V_obs = u_obs.function_space
+    disp_obs_dim = V_obs.element.value_shape[0]
+
+    V_cad = u_cad.function_space
+    disp_cad_dim = V_cad.element.value_shape[0]
+    dim = disp_cad_dim
+    assert disp_obs_dim == dim
+
+    tform_jac_cad_to_img_3D = tform_cad_to_img_4D[:3, :3]
+
+    bb_tree_obs = dolfinx.geometry.bb_tree(V_obs.mesh, 2)
+    midpoint_tree = dolfinx.geometry.create_midpoint_tree(
+        V_obs.mesh,
+        2,
+        np.arange(V_obs.mesh.topology.index_map(2).size_local, dtype=np.int32),
     )
+
+    def _u_cad_expr(x: NDArray) -> NDArray:
+        x_4D = np.concatenate([x, [np.ones_like(x[0])]])
+        x_img_4D = tform_cad_to_img_4D @ x_4D
+        x_img = x_img_4D[:3, :]
+
+        cell_candidates = dolfinx.geometry.compute_collisions_points(bb_tree_obs, x_img.T)
+        cells = dolfinx.geometry.compute_colliding_cells(V_obs.mesh, cell_candidates, x_img.T)
+        closest_entity = dolfinx.geometry.compute_closest_entity(bb_tree_obs, midpoint_tree, V_obs.mesh, x_img.T)
+
+        selected_cells = closest_entity
+        disp_eval = u_obs.eval(x_img.T, selected_cells)
+
+        disp_eval_scaled = np.linalg.inv(tform_jac_cad_to_img_3D) @ np.concatenate(
+            [disp_eval.T, [np.zeros_like(disp_eval.T[0])]]
+        )
+
+        # CORRECTION ICI : on coupe à 'dim' (2 ou 3) pour respecter l'espace cible
+        return disp_eval_scaled[:dim]
+
+    u_cad.interpolate(_u_cad_expr)
+
+# if __name__ == "__main__":
+#     dossier_csv = "/home/pmarechal/Documents/DP_N_E/images_and_csv"
+    
+#     process_csv_series_fenicsx(
+#         folder_path=dossier_csv, 
+#         output_xdmf="dic_series_complete.xdmf", 
+#         file_prefix="N_E_basler_", 
+#         alpha=20.0
+#     )
+
+import xml.etree.ElementTree as ET
+
+def project_h5_series_to_cad_mesh(
+    h5_path: str, 
+    mesh_cad: dolfinx.mesh.Mesh, 
+    tform_h5_to_cad_4D: NDArray, 
+    output_xdmf_path: str
+) -> None:
+    """Lit une série temporelle FEniCSx directement depuis son fichier H5 (via h5py),
+    reconstruit le maillage source et projette le champ de déplacement vectoriel
+    sur un maillage cible dolfinx.mesh.Mesh pour chaque pas de temps.
+    """
+    # =========================================================================
+    # 1. PARSING DE LA STRUCTURE ET DES PAS DE TEMPS
+    # =========================================================================
+    xdmf_path = h5_path.replace(".h5", ".xdmf")
+    steps = []
+    geom_path = "/Mesh/Grid/geometry"
+    topo_path = "/Mesh/Grid/topology"
+
+    if os.path.exists(xdmf_path):
+        print(f"[1/4] Analyse du fichier métadonnées {xdmf_path} pour identifier les datasets...")
+        tree = ET.parse(xdmf_path)
+        root = tree.getroot()
+        
+        try:
+            geom_path = next(root.iter("Geometry")).find("DataItem").text.split(":")[-1].strip()
+            topo_path = next(root.iter("Topology")).find("DataItem").text.split(":")[-1].strip()
+        except Exception:
+            pass 
+
+        for grid in root.findall(".//Grid"):
+            time_node = grid.find("Time")
+            attr_node = grid.find(".//Attribute[@Name='displacement']")
+            if time_node is not None and attr_node is not None:
+                t_val = float(time_node.get("Value"))
+                di = attr_node.find("DataItem")
+                if di is not None:
+                    ds_path = di.text.split(":")[-1].strip()
+                    steps.append((t_val, ds_path))
+    else:
+        print(f"[1/4] Fichier XDMF non trouvé. Inspection directe du fichier H5 : {h5_path}")
+        with h5py.File(h5_path, "r") as f:
+            mesh_key = list(f["Mesh"].keys())[0]
+            geom_path = f"/Mesh/{mesh_key}/geometry"
+            topo_path = f"/Mesh/{mesh_key}/topology"
+            func_group = f["Function/displacement"]
+            for k in sorted(list(func_group.keys()), key=lambda x: int(x) if x.isdigit() else x):
+                try:
+                    t_val = float(k)
+                except ValueError:
+                    t_val = float(len(steps))
+                steps.append((t_val, f"Function/displacement/{k}"))
+
+    if not steps:
+        raise ValueError("Aucun pas de temps ou champ de déplacement n'a pu être localisé.")
+    
+    steps.sort(key=lambda x: x[0])
+    print(f" -> {len(steps)} pas de temps détectés.")
+
+    # =========================================================================
+    # 2. CHARGEMENT DU MAILLAGE SOURCE DEPUIS LE H5 ET INSTANCIATION DOLFINX
+    # =========================================================================
+    print(f"[2/4] Extraction des tableaux de maillage depuis le H5...")
+    with h5py.File(h5_path, "r") as f:
+        points_obs = f[geom_path][:]
+        cells_obs = f[topo_path][:]
+
+    # FIX 1 : shape=(3,) définit proprement la dimension géométrique (gdim=3) pour UFL
+    coord_element = basix.ufl.element("Lagrange", "triangle", 1, shape=(3,))
+    domain_obs = ufl.Mesh(coord_element)
+    
+    # FIX 2 : Mots-clés nommés explicites pour contourner l'inversion d'arguments v0.9/v0.10
+    mesh_obs = dolfinx.mesh.create_mesh(
+        MPI.COMM_SELF, 
+        cells=cells_obs, 
+        x=points_obs, 
+        e=domain_obs
+    )
+    mesh_obs.topology.create_connectivity(mesh_obs.topology.dim - 1, mesh_obs.topology.dim)
+
+    # Initialisation des espaces de fonction (Déplacement 2D)
+    dim_disp = 2
+    V_obs = fem.functionspace(mesh_obs, ("CG", 1, (dim_disp,)))
+    u_obs = fem.Function(V_obs, name="displacement")
+    global_indices_obs = mesh_obs.geometry.input_global_indices
+
+    # Préparation de l'espace sur le maillage cible (CAD) reçu en argument
+    V_cad = fem.functionspace(mesh_cad, ("CG", 1, (dim_disp,)))
+    u_cad = fem.Function(V_cad, name="displacement_projected")
+
+    # =========================================================================
+    # 3. TRANSFORMATION DE COORDONNÉES (INVERSION)
+    # =========================================================================
+    print("[3/4] Inversion de la matrice de transformation spatiale...")
+    tform_cad_to_img_4D = np.linalg.inv(tform_h5_to_cad_4D)
+
+    # =========================================================================
+    # 4. BOUCLE TEMPORELLE DE LECTURE H5 ET PROJECTION
+    # =========================================================================
+    print(f"[4/4] Lancement de la projection temporelle brute vers : {output_xdmf_path}")
+    
+    with dolfinx.io.XDMFFile(mesh_cad.comm, output_xdmf_path, "w") as xdmf_out:
+        xdmf_out.write_mesh(mesh_cad)
+
+        with h5py.File(h5_path, "r") as f:
+            for t, ds_path in steps:
+                data_step = f[ds_path][:]
+                
+                ux = np.nan_to_num(data_step[:, 0], nan=0.0)
+                uy = np.nan_to_num(data_step[:, 1], nan=0.0)
+
+                if global_indices_obs is not None and global_indices_obs.size > 0:
+                    permuted_ux = ux[global_indices_obs]
+                    permuted_uy = uy[global_indices_obs]
+                else:
+                    permuted_ux = ux
+                    permuted_uy = uy
+
+                u_obs_array = u_obs.x.array
+                u_obs_array[0::2] = permuted_ux
+                u_obs_array[1::2] = permuted_uy
+                u_obs.x.scatter_forward()
+
+                # Appel à ta fonction externe d'interpolation géométrique
+                interpolate_displacement_obs_mesh_to_cad_mesh_2D(u_obs, u_cad, tform_cad_to_img_4D)
+
+                xdmf_out.write_function(u_cad, t)
+                print(f" -> Pas t={t} projeté avec succès.")
+
+    print(f"[Succès] Série temporelle complète exportée.")
+
+
+def resample_h5_time_series(
+    input_h5_path: str,
+    output_xdmf_path: str,
+    target_num: int,
+    kind: str = "linear"
+) -> None:
+    """Lit une série temporelle depuis un fichier H5, interpole le champ de déplacement
+    dans le temps pour atteindre exactement N pas de temps (target_num_steps), 
+    et sauvegarde le résultat dans un nouveau couple de fichiers XDMF/H5 natifs FEniCSx.
+    """
+    # =========================================================================
+    # 1. LECTURE DE LA STRUCTURE ET COLLECTE DES DONNÉES D'ORIGINE
+    # =========================================================================
+    target_num_steps = target_num + 1
+    xdmf_in_path = input_h5_path.replace(".h5", ".xdmf")
+    steps = []
+    geom_path = "/Mesh/Grid/geometry"
+    topo_path = "/Mesh/Grid/topology"
+
+    if os.path.exists(xdmf_in_path):
+        print(f"[1/4] Analyse de {xdmf_in_path}...")
+        tree = ET.parse(xdmf_in_path)
+        root = tree.getroot()
+        try:
+            geom_path = next(root.iter("Geometry")).find("DataItem").text.split(":")[-1].strip()
+            topo_path = next(root.iter("Topology")).find("DataItem").text.split(":")[-1].strip()
+        except Exception:
+            pass
+
+        for grid in root.findall(".//Grid"):
+            time_node = grid.find("Time")
+            attr_node = None
+            for attr in grid.findall(".//Attribute"):
+                if "displacement" in attr.get("Name", ""):
+                    attr_node = attr
+                    break
+                    
+            if time_node is not None and attr_node is not None:
+                t_val = float(time_node.get("Value"))
+                di = attr_node.find("DataItem")
+                if di is not None:
+                    steps.append((t_val, di.text.split(":")[-1].strip()))
+    else:
+        raise FileNotFoundError(f"Le fichier de métadonnées associé {xdmf_in_path} est requis.")
+
+    if not steps:
+        raise ValueError(f"Aucun dataset de déplacement n'a été trouvé dans {xdmf_in_path}.")
+
+    steps.sort(key=lambda x: x[0])
+    t_orig = np.array([s[0] for s in steps])
+    print(f" -> {len(t_orig)} pas de temps d'origine détectés (de t={t_orig[0]} à t={t_orig[-1]})")
+
+    # =========================================================================
+    # 2. CHARGEMENT ET DÉTECTION DYNAMIQUE DES DIMENSIONS
+    # =========================================================================
+    with h5py.File(input_h5_path, "r") as f:
+        points_obs = f[geom_path][:]
+        cells_obs = f[topo_path][:]
+        
+        # Détection de la dimension géométrique (ex: 3 pour X, Y, Z)
+        gdim = points_obs.shape[1]
+        
+        # Détection automatique du type de cellule selon le nombre de nœuds par maille
+        nodes_per_cell = cells_obs.shape[1]
+        if nodes_per_cell == 4:
+            cell_type = "tetrahedron"
+        elif nodes_per_cell == 3:
+            cell_type = "triangle"
+        else:
+            raise ValueError(f"Type de cellule non supporté : {nodes_per_cell} nœuds par élément.")
+        
+        # Détection de la dimension du champ de déplacement (ex: 2 pour UX, UY)
+        first_ds_path = steps[0][1]
+        dim_disp = f[first_ds_path].shape[1]
+        num_nodes = f[first_ds_path].shape[0]
+        
+        print(f"[2/4] Structure détectée : Éléments '{cell_type}' ({gdim}D) | Déplacement {dim_disp}D")
+        print(f"      Chargement de la matrice globale en RAM...")
+        
+        all_disp_orig = np.zeros((len(t_orig), num_nodes, dim_disp))
+        for idx, (_, ds_path) in enumerate(steps):
+            all_disp_orig[idx, :, :] = f[ds_path][:, :dim_disp]
+
+    # =========================================================================
+    # 3. INTERPOLATION TEMPORELLE
+    # =========================================================================
+    print(f"[3/4] Calcul de l'interpolation temporelle ({kind}) vers {target_num_steps} pas...")
+    t_target = np.linspace(t_orig[0], t_orig[-1], target_num_steps)
+    interpolator = interp1d(t_orig, all_disp_orig, axis=0, kind=kind, bounds_error=False, fill_value="extrapolate")
+    all_disp_target = interpolator(t_target)
+
+    # =========================================================================
+    # 4. RECONSTRUCTION DU MAILLAGE ET EXPORT SÉCURISÉ
+    # =========================================================================
+    print(f"[4/4] Écriture de la nouvelle série temporelle : {output_xdmf_path}")
+    
+    # Instanciation avec le type de cellule et la dimension correcte
+    coord_element = basix.ufl.element("Lagrange", cell_type, 1, shape=(gdim,))
+    domain_obs = ufl.Mesh(coord_element)
+    mesh_obs = dolfinx.mesh.create_mesh(MPI.COMM_SELF, cells=cells_obs, x=points_obs, e=domain_obs)
+
+    # Espace de fonction adapté à la dimension du déplacement (2D) sur le maillage (3D)
+    V_obs = fem.functionspace(mesh_obs, ("CG", 1, (dim_disp,)))
+    u_obs = fem.Function(V_obs, name="displacement_resampled")
+
+    # Arbre spatial pour faire correspondre les coordonnées physiques sans dépendre de l'ordre des DOFs
+    tree = KDTree(points_obs)
+
+    with dolfinx.io.XDMFFile(mesh_obs.comm, output_xdmf_path, "w") as xdmf_out:
+        xdmf_out.write_mesh(mesh_obs)
+        
+        for i, t in enumerate(t_target):
+            disp_step = np.nan_to_num(all_disp_target[i, :, :], nan=0.0)
+
+            # Le callback reçoit les coordonnées x sous la forme (3, num_points)
+            def interpolate_callback(x):
+                points_to_query = x[:gdim, :].T
+                _, indices = tree.query(points_to_query)
+                # Retourne une forme (dim_disp, num_points) attendue par DOLFINx
+                return disp_step[indices].T
+
+            u_obs.interpolate(interpolate_callback)
+            u_obs.x.scatter_forward()
+
+            xdmf_out.write_function(u_obs, t)
+
+    print(f"[Succès] Nouveau fichier temporel généré avec succès ({target_num_steps} pas).")
+
+if __name__ == "__main__":
+    resample_h5_time_series("results/projection_cad_temporelle.h5","results/resampling_time_series_linear.xdmf",50)
+
+
+# if __name__ == "__main__":
+#     import os
+
+#     # =========================================================================
+#     # 1. CONFIGURATION DES CHEMINS (À MODIFIER)
+#     # =========================================================================
+#     # Mettez ici les vrais chemins vers vos fichiers de test
+#     H5_FILE = "dic_series_complete.h5"
+#     GMSH_FILE = "astar_6mm.xdmf"
+#     OUTPUT_XDMF = "results/projection_cad_temporelle.xdmf"
+    
+#     # Paramètre alpha pour la triangulation Delaunay du nuage de points DIC
+#     ALPHA_TRIANGULATION = 20.0 
+#     domain = load_and_write_mesh(GMSH_FILE)
+#     # =========================================================================
+#     # 2. CONFIGURATION DE LA MATRICE DE TRANSFORMATION (H5 -> CAD)
+#     # =========================================================================
+#     ref_image = skimage.io.imread("N_E_basler_0000.tif", as_gray=True)
+#     tform_cad_to_img_4d = calibrate_2d_manual(domain,ref_image)
+#     tform_h5_to_cad = np.linalg.inv(tform_cad_to_img_4d)
+#     # Astuce : Si vous avez une translation connue (ex: +10mm en X et -5mm en Y) :
+#     # tform_h5_to_cad[0, 3] = 10.0
+#     # tform_h5_to_cad[1, 3] = -5.0
+
+#     # =========================================================================
+#     # 3. SÉCURITÉ ET LANCEMENT DU TRAITEMENT
+#     # =========================================================================
+#     print("=" * 60)
+#     print("  VÉRIFICATION ET LANCEMENT DE LA PROJECTION TEMPORELLE")
+#     print("=" * 60)
+
+#     if not os.path.exists(H5_FILE):
+#         print(f"[Erreur] Le fichier source H5 est introuvable : {H5_FILE}")
+#         print("-> Veuillez corriger la variable 'H5_FILE'.")
+        
+#     elif not os.path.exists(GMSH_FILE):
+#         print(f"[Erreur] Le fichier cible Gmsh (.msh) est introuvable : {GMSH_FILE}")
+#         print("-> Veuillez corriger la variable 'GMSH_FILE'.")
+        
+#     else:
+#         print(f"[OK] Fichier H5 trouvé : {H5_FILE}")
+#         print(f"[OK] Fichier Gmsh trouvé : {GMSH_FILE}")
+#         print(f"[Info] Fichier de sortie prévu : {OUTPUT_XDMF}\n")
+        
+#         try:
+#             # Exécution de la fonction globale de traitement
+#             project_h5_series_to_cad_mesh(
+#                 h5_path=H5_FILE,
+#                 mesh_cad=domain,
+#                 tform_h5_to_cad_4D=tform_h5_to_cad,
+#                 output_xdmf_path=OUTPUT_XDMF
+#             )
+#             print("\n" + "=" * 60)
+#             print("[Succès] Traitement terminé sans accroc.")
+#             print(f"[Aide] Vous pouvez maintenant ouvrir '{OUTPUT_XDMF}' dans ParaView")
+#             print("       pour visualiser le déplacement projeté sur la CAO au cours du temps.")
+#             print("=" * 60)
+            
+#         except Exception as e:
+#             print("\n" + "!" * 60)
+#             print("[Échec] Une erreur est survenue pendant l'interpolation :")
+#             print("!" * 60)
+#             import traceback
+#             traceback.print_exc()
