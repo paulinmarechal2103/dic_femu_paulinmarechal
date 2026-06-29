@@ -1,4 +1,5 @@
-# VIC-2D/3D Digital Image Correlation & Finite Element Model Updating Framework
+# PATRA
+# a VIC-2D/3D Digital Image Correlation & Finite Element Model Updating Framework
 
 A Python framework dedicated to VIC-2D/3D Digital Image Correlation (DIC) data exploitation for mechanical parameter identification. The pipeline leverages Finite Element Model Updating (FEMU), using FEniCSx for PDE solving.
 
