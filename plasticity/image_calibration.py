@@ -483,6 +483,103 @@ def check_calibration_2d(
     p.add_mesh(mesh_pv, show_edges=True)
     p.show()
 
+# def register_imgs_manual(img0: np.ndarray, img1: np.ndarray) -> np.ndarray:
+#     """Perform manual image registration using point-clicking with OpenCV.
+
+#     Args:
+#     ----
+#         img0 (NDArray): Reference CAD image (source)
+#         img1 (NDArray): Real DIC image (destination)
+
+#     Returns:
+#     -------
+#         NDArray: 4x4 homogeneous affine transformation matrix
+#     """
+#     h, w = img0.shape[:2]
+
+#     # Normalisation et conversion en uint8 pour OpenCV
+#     vis0_base = (img0 * 255).astype(np.uint8) if img0.dtype != np.uint8 else img0.copy()
+#     vis1_base = (img1 * 255).astype(np.uint8) if img1.dtype != np.uint8 else img1.copy()
+
+#     pts0 = []
+#     pts1 = []
+
+#     window_name = "Calibration Manuelle - ENTRER pour valider, ECHAP pour annuler"
+#     cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+
+#     # Gestionnaire d'événements de la souris
+#     def click_event(event, x, y, flags, param):
+#         if event == cv2.EVENT_LBUTTONDOWN:
+#             if x < w:
+#                 pts0.append([x, y])
+#                 print(f"Point CAO sélectionné : [{x}, {y}]")
+#             else:
+#                 pts1.append([x - w, y])
+#                 print(f"Point Image sélectionné : [{x - w}, {y}]")
+
+#     cv2.setMouseCallback(window_name, click_event)
+
+#     print("\n--- INSTRUCTIONS POUR LE POINTAGE ---")
+#     print("1. Cliquez sur un point structurel marquant à GAUCHE (Image CAO).")
+#     print("2. Cliquez sur son homologue à DROITE (Image Réelle).")
+#     print("3. Répétez l'opération pour au moins 3 ou 4 paires de points.")
+#     print("4. Appuyez sur ENTRÉE dans la fenêtre pour valider, ou sur ECHAP pour quitter.\n")
+
+#     while True:
+#         # Copie fraîche pour rafraîchir le tracé des cercles et index
+#         vis0 = cv2.cvtColor(vis0_base, cv2.COLOR_GRAY2BGR)
+#         vis1 = cv2.cvtColor(vis1_base, cv2.COLOR_GRAY2BGR)
+
+#         # Dessin des points CAO (Rouge)
+#         for idx, pt in enumerate(pts0):
+#             cv2.circle(vis0, (pt[0], pt[1]), 5, (0, 0, 255), -1)
+#             cv2.putText(vis0, str(idx + 1), (pt[0] + 8, pt[1] + 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+
+#         # Dessin des points réels (Vert)
+#         for idx, pt in enumerate(pts1):
+#             cv2.circle(vis1, (pt[0], pt[1]), 5, (0, 255, 0), -1)
+#             cv2.putText(vis1, str(idx + 1), (pt[0] + 8, pt[1] + 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+#         # Concaténation horizontale pour l'affichage côte à côte
+#         combined = np.hstack((vis0, vis1))
+#         cv2.imshow(window_name, combined)
+
+#         key = cv2.waitKey(30) & 0xFF
+#         if key == 13:  # Touche Entrée
+#             break
+#         elif key == 27:  # Touche Échap
+#             print("Calibration annulée par l'utilisateur.")
+#             cv2.destroyAllWindows()
+#             return np.identity(4)
+
+#     cv2.destroyAllWindows()
+
+#     # Vérification de la cohérence des listes de points
+#     min_pts = min(len(pts0), len(pts1))
+#     if min_pts < 3:
+#         print(f"Erreur : Pas assez de points appariés (Requis : >= 3, Reçu : {min_pts}).")
+#         return np.identity(4)
+
+#     if len(pts0) != len(pts1):
+#         print(f"Attention : Déséquilibre du nombre de points. Alignement effectué sur les {min_pts} premières paires.")
+
+#     np_pts0 = np.array(pts0[:min_pts], dtype=np.float32)
+#     np_pts1 = np.array(pts1[:min_pts], dtype=np.float32)
+
+#     # Estimation robuste de la matrice affine 2D (2x3)
+#     M, inliers = cv2.estimateAffine2D(np_pts0, np_pts1)
+
+#     if M is None:
+#         print("Erreur de calcul mathématique lors de l'estimation de la matrice affine. Retour Matrice Identité.")
+#         return np.identity(4)
+
+#     # Conversion de la matrice affine 2D (2x3) en matrice homogène 4D (4x4)
+#     tform_ref_to_img_4d = np.identity(4)
+#     tform_ref_to_img_4d[:2, :2] = M[:2, :2]
+#     tform_ref_to_img_4d[:2, 3] = M[:2, 2]
+
+#     return tform_ref_to_img_4d
+
 def register_imgs_manual(img0: np.ndarray, img1: np.ndarray) -> np.ndarray:
     """Perform manual image registration using point-clicking with OpenCV.
 
@@ -497,25 +594,52 @@ def register_imgs_manual(img0: np.ndarray, img1: np.ndarray) -> np.ndarray:
     """
     h, w = img0.shape[:2]
 
+    # --- CONFIGURATION DE L'AFFICHAGE ---
+    # Définir une hauteur max pour que la fenêtre s'adapte à l'écran
+    DISPLAY_H = 1080
+    scale = DISPLAY_H / h
+    w0_scaled = int(w * scale)
+    w1_scaled = int(img1.shape[1] * scale)
+    # -------------------------------------
+
     # Normalisation et conversion en uint8 pour OpenCV
-    vis0_base = (img0 * 255).astype(np.uint8) if img0.dtype != np.uint8 else img0.copy()
-    vis1_base = (img1 * 255).astype(np.uint8) if img1.dtype != np.uint8 else img1.copy()
+    vis0_base = (
+        (img0 * 255).astype(np.uint8) if img0.dtype != np.uint8 else img0.copy()
+    )
+    vis1_base = (
+        (img1 * 255).astype(np.uint8) if img1.dtype != np.uint8 else img1.copy()
+    )
+
+    # Redimensionnement des bases pour l'affichage visuel
+    vis0_resized_base = cv2.resize(vis0_base, (w0_scaled, DISPLAY_H))
+    vis1_resized_base = cv2.resize(vis1_base, (w1_scaled, DISPLAY_H))
 
     pts0 = []
     pts1 = []
 
     window_name = "Calibration Manuelle - ENTRER pour valider, ECHAP pour annuler"
-    cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+    # WINDOW_NORMAL permet de redimensionner manuellement la fenêtre si besoin
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     # Gestionnaire d'événements de la souris
     def click_event(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
-            if x < w:
-                pts0.append([x, y])
-                print(f"Point CAO sélectionné : [{x}, {y}]")
+            if x < w0_scaled:
+                # Conversion de la coordonnée affichée vers la coordonnée réelle (haute définition)
+                orig_x = int(x / scale)
+                orig_y = int(y / scale)
+                pts0.append([orig_x, orig_y])
+                print(
+                    f"Point CAO sélectionné (Origine) : [{orig_x}, {orig_y}]"
+                )
             else:
-                pts1.append([x - w, y])
-                print(f"Point Image sélectionné : [{x - w}, {y}]")
+                # Conversion et prise en compte du décalage de la transition d'image (w0_scaled)
+                orig_x = int((x - w0_scaled) / scale)
+                orig_y = int(y / scale)
+                pts1.append([orig_x, orig_y])
+                print(
+                    f"Point Image sélectionné (Origine) : [{orig_x}, {orig_y}]"
+                )
 
     cv2.setMouseCallback(window_name, click_event)
 
@@ -523,24 +647,46 @@ def register_imgs_manual(img0: np.ndarray, img1: np.ndarray) -> np.ndarray:
     print("1. Cliquez sur un point structurel marquant à GAUCHE (Image CAO).")
     print("2. Cliquez sur son homologue à DROITE (Image Réelle).")
     print("3. Répétez l'opération pour au moins 3 ou 4 paires de points.")
-    print("4. Appuyez sur ENTRÉE dans la fenêtre pour valider, ou sur ECHAP pour quitter.\n")
+    print(
+        "4. Appuyez sur ENTRÉE dans la fenêtre pour valider, ou sur ECHAP pour quitter.\n"
+    )
 
     while True:
-        # Copie fraîche pour rafraîchir le tracé des cercles et index
-        vis0 = cv2.cvtColor(vis0_base, cv2.COLOR_GRAY2BGR)
-        vis1 = cv2.cvtColor(vis1_base, cv2.COLOR_GRAY2BGR)
+        # On travaille sur les images redimensionnées pour l'affichage graphique
+        vis0 = cv2.cvtColor(vis0_resized_base, cv2.COLOR_GRAY2BGR)
+        vis1 = cv2.cvtColor(vis1_resized_base, cv2.COLOR_GRAY2BGR)
 
-        # Dessin des points CAO (Rouge)
+        # Dessin des points CAO (Rouge) - On adapte la position stockée à l'affichage
         for idx, pt in enumerate(pts0):
-            cv2.circle(vis0, (pt[0], pt[1]), 5, (0, 0, 255), -1)
-            cv2.putText(vis0, str(idx + 1), (pt[0] + 8, pt[1] + 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+            display_x = int(pt[0] * scale)
+            display_y = int(pt[1] * scale)
+            cv2.circle(vis0, (display_x, display_y), 5, (0, 0, 255), -1)
+            cv2.putText(
+                vis0,
+                str(idx + 1),
+                (display_x + 8, display_y + 8),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 0, 255),
+                1,
+            )
 
-        # Dessin des points réels (Vert)
+        # Dessin des points réels (Vert) - On adapte la position stockée à l'affichage
         for idx, pt in enumerate(pts1):
-            cv2.circle(vis1, (pt[0], pt[1]), 5, (0, 255, 0), -1)
-            cv2.putText(vis1, str(idx + 1), (pt[0] + 8, pt[1] + 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            display_x = int(pt[0] * scale)
+            display_y = int(pt[1] * scale)
+            cv2.circle(vis1, (display_x, display_y), 5, (0, 255, 0), -1)
+            cv2.putText(
+                vis1,
+                str(idx + 1),
+                (display_x + 8, display_y + 8),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                1,
+            )
 
-        # Concaténation horizontale pour l'affichage côte à côte
+        # Concaténation horizontale des images adaptées à l'écran
         combined = np.hstack((vis0, vis1))
         cv2.imshow(window_name, combined)
 
@@ -557,20 +703,26 @@ def register_imgs_manual(img0: np.ndarray, img1: np.ndarray) -> np.ndarray:
     # Vérification de la cohérence des listes de points
     min_pts = min(len(pts0), len(pts1))
     if min_pts < 3:
-        print(f"Erreur : Pas assez de points appariés (Requis : >= 3, Reçu : {min_pts}).")
+        print(
+            f"Erreur : Pas assez de points appariés (Requis : >= 3, Reçu : {min_pts})."
+        )
         return np.identity(4)
 
     if len(pts0) != len(pts1):
-        print(f"Attention : Déséquilibre du nombre de points. Alignement effectué sur les {min_pts} premières paires.")
+        print(
+            f"Attention : Déséquilibre du nombre de points. Alignement effectué sur les {min_pts} premières paires."
+        )
 
     np_pts0 = np.array(pts0[:min_pts], dtype=np.float32)
     np_pts1 = np.array(pts1[:min_pts], dtype=np.float32)
 
-    # Estimation robuste de la matrice affine 2D (2x3)
+    # Estimation robuste de la matrice affine 2D (2x3) sur les vraies coordonnées
     M, inliers = cv2.estimateAffine2D(np_pts0, np_pts1)
 
     if M is None:
-        print("Erreur de calcul mathématique lors de l'estimation de la matrice affine. Retour Matrice Identité.")
+        print(
+            "Erreur de calcul mathématique lors de l'estimation de la matrice affine. Retour Matrice Identité."
+        )
         return np.identity(4)
 
     # Conversion de la matrice affine 2D (2x3) en matrice homogène 4D (4x4)
