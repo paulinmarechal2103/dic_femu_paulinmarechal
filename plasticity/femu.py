@@ -224,7 +224,7 @@ def compute_hill_raw_h5_error_from_parameters(f, params = [200_000.0, 0.3, 100.0
         Q_var=hill_params["Q_var"],
         k_hardening=hill_params["k_hardening"]
     )
-    _, u_sim = run_simulation_V2(hill_params, model=modèle_hill48, write_output=False)
+    _, u_sim = run_simulation_fast(hill_params, model=modèle_hill48, write_output=False)
     error = compute_u_sim_raw_h5_diff(f, u_sim)
     return error
 
@@ -270,7 +270,7 @@ def compute_J2_raw_h5_error_from_parameters(domain,V, W, WT,f, params = [200_000
 
     try:
         # On tente de lancer la simulation dolfinx
-        _, u_sim = run_simulation_V3(domain, V, W, WT, hill_params, model=model, write_output=False)
+        _, u_sim = run_simulation_fast(domain, V, W, WT, hill_params, model=model, write_output=False)
         error = compute_u_sim_raw_h5_diff(f, u_sim)
     except RuntimeError as e:
         # Si le solveur de Newton échoue, on ne crash pas !
@@ -322,7 +322,7 @@ def compute_J2_residuals(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 50.
 
     try:
         # On tente de lancer la simulation dolfinx
-        _, u_sim = run_simulation_V3(domain, V, W, WT, hill_params, model=model, write_output=False)
+        _, u_sim = run_simulation_fast(domain, V, W, WT, hill_params, model=model, write_output=False)
         error = compute_u_residuals(f, u_sim)
     except RuntimeError as e:
         # Si le solveur de Newton échoue, on ne crash pas !
@@ -384,7 +384,7 @@ def compute_hill_residuals(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 5
 
     try:
         # On tente de lancer la simulation dolfinx
-        _, u_sim = run_simulation_V3(domain, V, W, WT, hill_params,1, model=model_hill48, write_output=False)
+        _, u_sim = run_simulation_fast(domain, V, W, WT, hill_params,1, model=model_hill48, write_output=False)
         error = compute_u_residuals(f, u_sim)
     except RuntimeError as e:
         # Si le solveur de Newton échoue, on ne crash pas !

@@ -1353,20 +1353,20 @@ if __name__ == "__main__":
     )
 
     # ---- load mesh and build function spaces -----------------------------
-    with io.XDMFFile(MPI.COMM_WORLD, "astar_6mm.xdmf", "r") as xdmf:
-        domain = xdmf.read_mesh(name="Grid")
-        V, W, WT = build_function_spaces(domain)
+    #with io.XDMFFile(MPI.COMM_WORLD, "".xdmf", "r") as xdmf:
+    domain = load_and_write_mesh(config["mesh_file"])
+    V, W, WT = build_function_spaces(domain)
 
-        # ---- run simulation with relaxation phase ----------------------------
-        forces, _ = run_simulation_write(domain, V, W, WT, config=config)
-        print("pas de soucis la team")
+    # ---- run simulation with relaxation phase ----------------------------
+    forces, _ = run_simulation_write(domain, V, W, WT, config=config)
+    print("pas de soucis la team")
 
-        # ---- plot reaction force vs. time step -------------------------------
-        plt.figure()
-        plt.plot(forces)
-        plt.xlabel("Time step")
-        plt.ylabel("Reaction force")
-        plt.title("Reaction force vs. time step")
-        plt.grid(True)
-        plt.tight_layout()
-        plt.show()
+    # ---- plot reaction force vs. time step -------------------------------
+    plt.figure()
+    plt.plot(forces)
+    plt.xlabel("Time step")
+    plt.ylabel("Reaction force")
+    plt.title("Reaction force vs. time step")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()

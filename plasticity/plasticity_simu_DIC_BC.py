@@ -238,74 +238,23 @@ def dirichlet_bcs_from_h5_interpolate(domain, space, h5_file_path, t_index, data
     return [bc_left, bc_right]
 
 
-def dirichlet_bcs_from_h5(domain, space, f, t_index, dataset_path="/Function/displacement_projected"):
-    """
-    Build Dirichlet boundary conditions on the rough top/bottom surfaces by
-    directly mapping displacements from an already-open HDF5 file handle
-    onto the boundary DOFs of the current domain, using a KD-Tree
-    nearest-neighbour search restricted to the boundary DOFs.
-
-    Compared to :func:`dirichlet_bcs_from_h5_interpolate`, this variant is
-    the fast/lean path suitable for use inside a time-stepping loop: instead
-    of building a global scattered-data interpolator over the whole domain,
-    it only performs a nearest-neighbour lookup for the (much smaller) set
-    of boundary DOFs, and it expects the HDF5 file to already be open
-    (avoiding repeated file-open overhead across time steps).
-
-    Parameters
-    ----------
-    domain : dolfinx.mesh.Mesh
-        The current computational domain on which boundary conditions are
-        to be imposed.
-    space : dolfinx.fem.FunctionSpace
-        The (vector-valued) displacement function space associated with
-        ``domain``.
-    f : h5py.File
-        An already-open HDF5 file handle containing the parent mesh
-        geometry and the time-series of the source displacement field.
-    t_index : int
-        Index of the time step / dataset to read from
-        ``dataset_path/{t_index}`` inside the HDF5 file.
-    dataset_path : str, optional
-        Base HDF5 group path under which the per-time-step displacement
-        datasets are stored. Defaults to
-        ``"/Function/displacement_projected"``.
-
-    Returns
-    -------
-    list[dolfinx.fem.DirichletBC]
-        A two-element list ``[bc_left, bc_right]`` containing the Dirichlet
-        boundary condition objects for the low-Y ("left"/bottom) and
-        high-Y ("right"/top) boundary surfaces, both driven by the mapped
-        displacement field.
-
-    Notes
-    -----
-    - Boundary facets are identified geometrically in the same way as in
-      :func:`dirichlet_bcs_from_h5_interpolate`: exterior facets whose
-      midpoint lies within ``tol_rugosite`` of the global Y-extent are
-      classified as bottom or top surface facets.
-    - A single KD-Tree is built over the full parent point cloud
-      (``Mesh/Grid/geometry``) and queried only for the boundary DOF
-      coordinates, which is significantly cheaper than a full-domain
-      interpolation.
-    - If the maximum nearest-neighbour distance across the boundary DOFs
-      exceeds ``1e-5``, a warning is printed, since this indicates that the
-      current boundary DOFs do not closely coincide with parent mesh nodes
-      (the mapping is then only an approximation).
-    - All DOFs are first zero-initialized; only the identified boundary DOFs
-      are subsequently overwritten with values gathered from the HDF5
-      dataset via the KD-Tree mapping.
-    """
-    fdim = domain.topology.dim - 1
-    gdim = domain.geometry.dim
+def dirichlet_bcs_from_h5(domain, space, f, t_index, dataset_path="/Function/displacement_projected", tol_rugosite=5.0):
+    # [...] (votre docstring reste inchangée)
+    
+    tdim = domain.topology.dim  # Dimension topologique (3 pour un maillage 3D)
+    fdim = tdim - 1             # Dimension des facettes (2 pour de la 3D)
+    gdim = domain.geometry.dim  # Dimension géométrique de l'espace (3 pour du X, Y, Z)
+    
+    # Le nombre de composantes de votre champ de déplacement (2 pour de la DIC 2D)
+    vdim = space.dofmap.bs      
 
     # 1. Identification of the facets and DOFs of the top/bottom surfaces.
     x_coords = domain.geometry.x[:, 1]
     y_min, y_max = np.min(x_coords), np.max(x_coords)
-    tol_rugosite = 5.0
+    
 
-    domain.topology.create_connectivity(fdim, gdim)
+    # CORRECTION : On utilise tdim (3) et non gdim (3) car create_connectivity attend des dimensions topologiques
+    domain.topology.create_connectivity(fdim, tdim)
     boundary_facets = mesh.exterior_facet_indices(domain.topology)
     facet_centers = mesh.compute_midpoints(domain, fdim, boundary_facets)
 
@@ -322,18 +271,18 @@ def dirichlet_bcs_from_h5(domain, space, f, t_index, dataset_path="/Function/dis
     try:
         points_parent = f["Mesh/Grid/geometry"][:]
     except KeyError:
-        raise KeyError("Le fichier H5 doit contenir les coordonnées des nœuds d'origine.")
+        try:
+            points_parent = f["Mesh/mesh/geometry"][:]
+        except KeyError:
+            raise KeyError("Le fichier H5 doit contenir les coordonnées des nœuds d'origine.")
 
     full_path = f"{dataset_path}/{t_index}"
-    h5_data = f[full_path][:]  # Shape: (N_nodes_parent, gdim)
+    h5_data = f[full_path][:]  # Shape attendue: (N_nodes_parent, vdim)
 
-    # 3. Build the KD-Tree over the full parent HDF5 mesh.
-    # (We search the whole parent point cloud for the points matching our
-    # current boundary DOFs.)
+    # 3. Build the KD-Tree over the full parent HDF5 mesh (qui est en 3D)
     tree = KDTree(points_parent[:, :gdim])
 
-    # Retrieve the coordinates of ALL DOFs, then extract those on our
-    # boundaries of interest.
+    # Retrieve the coordinates of ALL DOFs
     all_dof_coords = space.tabulate_dof_coordinates()
     boundary_coords = all_dof_coords[boundary_dofs, :gdim]
 
@@ -349,11 +298,10 @@ def dirichlet_bcs_from_h5(domain, space, f, t_index, dataset_path="/Function/dis
     # By default the whole field is 0.0 (interior DOFs remain at 0).
     u_boundary.x.array[:] = 0.0
 
-    bs = space.dofmap.bs
-    # Apply displacements only to the boundary DOFs.
-    for comp in range(gdim):
+    # CORRECTION : On boucle sur vdim (2 composantes) et non gdim (3 coordonnées de maillage)
+    for comp in range(vdim):
         # Real indices into the flat DOLFINx array.
-        dof_indices_flat = boundary_dofs * bs + comp
+        dof_indices_flat = boundary_dofs * vdim + comp
 
         # Direct assignment of the corresponding HDF5 values.
         u_boundary.x.array[dof_indices_flat] = h5_data[mapping_indices, comp]
@@ -366,6 +314,46 @@ def dirichlet_bcs_from_h5(domain, space, f, t_index, dataset_path="/Function/dis
 
     return [bc_left, bc_right]
 
+def estimate_boundary_tol(domain, safety_factor=1.5):
+    """
+    Estime une tolérance de capture des DOFs de bord basée sur la taille
+    locale des éléments au bord du maillage (calcul manuel, indépendant
+    de la version de dolfinx — mesh.h n'existe pas dans toutes les versions).
+    """
+    tdim = domain.topology.dim
+    fdim = tdim - 1
+    gdim = domain.geometry.dim
+
+    domain.topology.create_connectivity(fdim, tdim)
+    domain.topology.create_connectivity(fdim, 0)  # facette -> sommets
+
+    boundary_facets = mesh.exterior_facet_indices(domain.topology)
+
+    # Connectivité facette -> sommets (indices topologiques)
+    f_to_v = domain.topology.connectivity(fdim, 0)
+
+    # Table de correspondance sommet topologique -> indice dans domain.geometry.x
+    # (en général identiques pour les maillages P1, mais on passe par
+    # geometry.dofmap pour être robuste)
+    geom_dofmap = domain.geometry.dofmap
+
+    x = domain.geometry.x[:, :gdim]
+
+    h_facets = np.zeros(len(boundary_facets))
+    for i, facet in enumerate(boundary_facets):
+        verts = f_to_v.links(facet)
+        coords = x[verts]
+        # diamètre = distance max entre deux sommets de la facette
+        if len(coords) > 1:
+            diffs = coords[:, None, :] - coords[None, :, :]
+            dists = np.linalg.norm(diffs, axis=-1)
+            h_facets[i] = dists.max()
+        else:
+            h_facets[i] = 0.0
+
+    h_facets = h_facets[h_facets > 0]  # sécurité
+    tol = safety_factor * np.median(h_facets)
+    return tol
 
 def run_simulation_bc_h5_write(domain, V, W, WT, config=None, coord=1,
                          model: PlasticityModel = None, write_output: bool = True):
@@ -409,7 +397,6 @@ def run_simulation_bc_h5_write(domain, V, W, WT, config=None, coord=1,
     dt        = (cfg["T"] - t) / num_steps
     h5_bc_path = cfg["h5_bc_path"]
     h5_function_path = cfg["h5_function_path"]
-
     # ---------------------------------------- output file ----------------
     fic = None
     if write_output:
@@ -602,6 +589,8 @@ def run_simulation_bc_h5_fast(domain, V, W, WT, config=None, coord=1, model: Pla
     h5_bc_path = cfg["h5_bc_path"]
     h5_function_path = cfg["h5_function_path"]
 
+    tol = estimate_boundary_tol(domain, safety_factor=3.0)
+    print(f"Boundary tolerance: {tol}")
     fic = None  # no output file in this variant
 
     # ----------------------------------------- build plasticity model ----
@@ -616,7 +605,7 @@ def run_simulation_bc_h5_fast(domain, V, W, WT, config=None, coord=1, model: Pla
     # ---------------------------------------- boundary conditions --------
     gdim = domain.geometry.dim
     with h5py.File(h5_bc_path, "r") as f:
-        bcs = dirichlet_bcs_from_h5(domain, V,f, 0, h5_function_path)
+        bcs = dirichlet_bcs_from_h5(domain, V,f, 0, h5_function_path,tol)
 
         uh, problem, solver = build_solver(domain, V, model, state, bcs)
         ds                  = build_right_facet_tag(domain, coord)
@@ -631,9 +620,8 @@ def run_simulation_bc_h5_fast(domain, V, W, WT, config=None, coord=1, model: Pla
         log.set_log_level(log.LogLevel.ERROR)
 
         for step in range(num_steps + 1):
-            print(step)
             t      += dt
-            bcs = dirichlet_bcs_from_h5(domain, V, f, step, h5_function_path)
+            bcs = dirichlet_bcs_from_h5(domain, V, f, step, h5_function_path, tol)
 
             problem.bcs = bcs
             solver.solve(uh)
@@ -652,7 +640,7 @@ def run_simulation_bc_h5_fast(domain, V, W, WT, config=None, coord=1, model: Pla
 
             # Advance history variables to tₙ₊₁
             model.commit(state, uh)
-
+    print("p_max =", np.max(state.p_old.x.array), " | p_mean =", np.mean(state.p_old.x.array))
     if fic is not None:
         fic.close()
 

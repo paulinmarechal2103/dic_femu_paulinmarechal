@@ -268,7 +268,7 @@ if __name__ == "__main__":
     V, W, WT = build_function_spaces(domain)
     from time import time
     start_time = time()
-    forces, _ = run_simulation_V3(domain,V,W,WT,config=config, model=modèle_hill48)
+    forces, _ = run_simulation_fast(domain,V,W,WT,config=config, model=modèle_hill48)
     end_time = time()
     print(f"Simulation completed in {end_time - start_time:.2f} seconds.")
     print("pas de soucis la team")

@@ -3,178 +3,221 @@ import h5py
 import numpy as np
 
 
-from plasticity_simu import *
+from plasticity_simu_DIC_BC import *
+from femu import *
 from hill48_model import Hill48Model,Hill48state
 
 from scipy.optimize import minimize,least_squares, Bounds
 
 from image_calibration import *
 from dolfinx import geometry
+from scipy.spatial import KDTree
 
-def compute_direct_h5_diff(h5_file1, h5_file2):
+# def compute_u_residuals_is_imported(f, u_sim, V, dataset_path="/Function/displacement_projected",
+#                                      mask_value=0.1, atol=1e-6, tol_max_dist=1e-5):
+#     """
+#     Calcule les résidus de déplacement entre le champ de référence (H5)
+#     et le champ simulé u_sim (liste de uh.x.array.copy(), un par pas de temps),
+#     uniquement aux points où is_imported == mask_value.
+
+#     La correspondance géométrique H5 <-> DOFs de `V` se fait via un KDTree
+#     découpé par composante (subspace collapse) pour s'affranchir du layout de dolfinx.
+#     """
+#     gdim = V.mesh.geometry.dim
+#     vdim = V.dofmap.bs
+
+#     # --- 1. Extraction et application du masque is_imported ---
+#     is_imported_path = "/Function/is_imported"
+#     if is_imported_path not in f:
+#         raise KeyError(f"La fonction '{is_imported_path}' est introuvable dans le fichier H5.")
+
+#     is_imported_group = f[is_imported_path]
+#     if isinstance(is_imported_group, h5py.Dataset):
+#         is_imported = is_imported_group[:].flatten()
+#     else:
+#         is_imported = is_imported_group["0"][:].flatten()
+
+#     mask = np.isclose(is_imported, mask_value, atol=atol)
+#     if mask.sum() == 0:
+#         raise ValueError(f"Aucun point avec is_imported ≈ {mask_value} trouvé.")
+
+#     # --- 2. Recherche récursive automatique du dataset 'geometry' ---
+#     def find_geometry_dataset(group):
+#         if "geometry" in group and isinstance(group["geometry"], h5py.Dataset):
+#             return group["geometry"][:]
+#         for key in group.keys():
+#             if isinstance(group[key], h5py.Group):
+#                 res = find_geometry_dataset(group[key])
+#                 if res is not None:
+#                     return res
+#         return None
+
+#     points_parent = find_geometry_dataset(f)
+#     if points_parent is None:
+#         raise KeyError(
+#             f"Impossible de localiser un dataset nommé 'geometry' dans l'arborescence du fichier H5. "
+#             f"Groupes présents à la racine : {list(f.keys())}"
+#         )
+
+#     # Extraction des coordonnées des points d'intérêt
+#     masked_points = points_parent[mask, :gdim]
+
+#     # --- 3. Cartographie géométrique des DOFs (Subspace Collapse) ---
+#     num_masked_points = len(masked_points)
+#     flat_indices = np.zeros((num_masked_points, vdim), dtype=np.int32)
+
+#     for comp in range(vdim):
+#         # On isole le sous-espace associé à la composante courante (X, Y ou Z)
+#         sub_V, sub_to_parent = V.sub(comp).collapse()
+#         sub_coords = sub_V.tabulate_dof_coordinates()[:, :gdim]
+
+#         # Appariement géométrique par composante
+#         tree = KDTree(sub_coords)
+#         distances, sub_dof_indices = tree.query(masked_points)
+
+#         if np.any(distances > tol_max_dist):
+#             max_d = np.max(distances)
+#             raise ValueError(
+#                 f"Erreur d'appariement géométrique sur la composante {comp} : "
+#                 f"la distance max ({max_d:.2e}) dépasse la tolérance tol_max_dist ({tol_max_dist:.2e})."
+#             )
+
+#         # Stockage de la table de correspondance inverse fournie par dolfinx
+#         flat_indices[:, comp] = sub_to_parent[sub_dof_indices]
+
+#     # --- 4. Boucle sur les pas de temps et calcul des résidus ---
+#     if dataset_path not in f:
+#         raise KeyError(f"Le chemin '{dataset_path}' est introuvable dans le fichier H5.")
+
+#     displacement_group = f[dataset_path]
+#     errors = []
+#     step = 0
+
+#     while str(step) in displacement_group:
+#         if step >= len(u_sim):
+#             raise IndexError(
+#                 f"Le pas de temps {step} est requis par le fichier H5 mais absent de la liste u_sim "
+#                 f"(taille de u_sim : {len(u_sim)})."
+#             )
+
+#         # Référence H5 : forme (N_points_total, vdim) -> Extraction des lignes masquées
+#         d1 = displacement_group[str(step)][:][mask, :vdim]
+        
+#         # Simulation : Extraction via la matrice d'indices (N_masked, vdim)
+#         d2 = u_sim[step][flat_indices]
+
+#         # Différence brute aplatie pour least_squares
+#         diff = (d1 - d2).flatten()
+#         errors.append(diff)
+#         step += 1
+
+#     if step == 0:
+#         raise ValueError(f"Aucun pas de temps n'a pu être lu sous le chemin {dataset_path}.")
+
+#     return np.concatenate(errors)
+
+def compute_u_residuals_is_imported(f, u_sim, V, dataset_path="/Function/displacement_projected",
+                                          mask_value=0.1, atol=1e-6, tol_max_dist=1e-5, atol_z=1e-6):
     """
+    Calcule les résidus de déplacement (composantes X et Y uniquement) entre H5 et u_sim,
+    pour les points où is_imported == mask_value ET z == 0.
     """
-    errors = []
+    gdim = V.mesh.geometry.dim
+    vdim = V.dofmap.bs
+
+    # --- 1. Extraction du masque is_imported ---
+    is_imported_path = "/Function/is_imported"
+    if is_imported_path not in f:
+        raise KeyError(f"La fonction '{is_imported_path}' est introuvable dans le fichier H5.")
+
+    is_imported_group = f[is_imported_path]
+    if isinstance(is_imported_group, h5py.Dataset):
+        is_imported = is_imported_group[:].flatten()
+    else:
+        is_imported = is_imported_group["0"][:].flatten()
+
+    mask_imported = np.isclose(is_imported, mask_value, atol=atol)
+
+    # --- 2. Extraction de la géométrie et création du masque Z=0 ---
+    def find_geometry_dataset(group):
+        if "geometry" in group and isinstance(group["geometry"], h5py.Dataset):
+            return group["geometry"][:]
+        for key in group.keys():
+            if isinstance(group[key], h5py.Group):
+                res = find_geometry_dataset(group[key])
+                if res is not None:
+                    return res
+        return None
+
+    points_parent = find_geometry_dataset(f)
+    if points_parent is None:
+        raise KeyError("Impossible de localiser le dataset 'geometry' dans le H5.")
+
+    # Création du masque combiné : is_imported ET z=0
+    if gdim >= 3:
+        z_coords = points_parent[:, 2]
+        mask_z = np.isclose(z_coords, 0.0, atol=atol_z)
+        final_mask = mask_imported & mask_z
+    else:
+        # Si le maillage est 2D, Z=0 est implicite
+        final_mask = mask_imported
+
+    if final_mask.sum() == 0:
+        raise ValueError(f"Aucun point avec is_imported ≈ {mask_value} ET Z ≈ 0 trouvé.")
+
+    masked_points = points_parent[final_mask, :gdim]
+
+    # --- 3. Cartographie géométrique des DOFs pour X et Y uniquement ---
+    num_masked_points = len(masked_points)
     
-    with h5py.File(h5_file1, 'r') as f1, h5py.File(h5_file2, 'r') as f2:
-        # Dans votre fichier, le chemin est : /Function/displacement/0, 1, 2...
-        base_path = "Function/displacement"
-        
-        step = 0
-        while str(step) in f1[base_path]:
-            # Lecture des arrays numpy directs
-            d1 = f1[f"{base_path}/{step}"][:]
-            d2 = f2[f"{base_path}/{step}"][:]
-            
-            # Calcul de la norme de la différence
-            diff = np.linalg.norm(d1 - d2)
+    # On définit explicitement les composantes ciblées : 0 (X) et 1 (Y)
+    active_comps = [0, 1] if vdim >= 2 else [0]
+    flat_indices = np.zeros((num_masked_points, len(active_comps)), dtype=np.int32)
 
+    for i, comp in enumerate(active_comps):
+        sub_V, sub_to_parent = V.sub(comp).collapse()
+        sub_coords = sub_V.tabulate_dof_coordinates()[:, :gdim]
 
-            errors.append(diff)
-            
-            print(f"Pas {step} : Différence = {diff}")
-            step += 1
-            
-    return np.sum(errors)
+        tree = KDTree(sub_coords)
+        distances, sub_dof_indices = tree.query(masked_points)
 
-# # Utilisation (remplacez par vos noms de fichiers .h5)
-# diffs = compute_direct_h5_diff("femu_files/res.h5", "femu_files/donnes_ref.h5")
-# print(f"Différence totale : {diffs}")
+        if np.any(distances > tol_max_dist):
+            max_d = np.max(distances)
+            raise ValueError(
+                f"Erreur d'appariement sur la composante {comp} : "
+                f"distance max ({max_d:.2e}) > tolérance ({tol_max_dist:.2e})."
+            )
 
-#_, u = run_simulation()
+        flat_indices[:, i] = sub_to_parent[sub_dof_indices]
 
+    # --- 4. Calcul des résidus sur X et Y ---
+    if dataset_path not in f:
+        raise KeyError(f"Le chemin '{dataset_path}' est introuvable dans le fichier H5.")
 
-
-
-
-def compute_u_sim_h5_diff(h5_file, u_sim, base_path = "Function/displacement"):
-    """Compute the total displacement difference between H5 reference and simulation output."""
+    displacement_group = f[dataset_path]
     errors = []
-    with h5py.File(h5_file, 'r') as f:
-        
-        
-        step = 0
-        while str(step) in f[base_path]:
-            d1 = f[f"{base_path}/{step}"][:]
-            d2 = u_sim[step]
-            
-            # FIX: Reshape the flattened 1D array to match (num_nodes, 3)
-            d2 = d2.reshape(d1.shape)
-            
-            # Calcul de la norme de la différence
-            diff = np.linalg.norm(d1 - d2)**2
-            errors.append(diff)
-            
-            print(f"Pas {step} : Différence = {diff}")
-            step += 1
-            
-    return np.sum(errors)
-
-
-#diffs = compute_u_sim_h5_diff("femu_files/donnes_ref.h5", u)
-#print(f"Différence totale : {diffs}")
-
-def compute_u_sim_raw_h5_diff(f, u_sim, base_path = "Function/displacement"):
-    """
-    Compute the total displacement difference between 
-    H5 reference raw file extracted with h5py
-    and simulation output array.
-    """
-    errors = []
-    
     step = 0
-    while str(step) in f[base_path]:
-        d1 = f[f"{base_path}/{step}"][:]
-        d2 = u_sim[step]
+
+    while str(step) in displacement_group:
+        if step >= len(u_sim):
+            raise IndexError(f"Le pas de temps {step} est absent de u_sim.")
+
+        # Référence H5 : application du masque combiné puis sélection des colonnes X et Y
+        d1 = displacement_group[str(step)][:][final_mask][:, active_comps]
         
-        # FIX: Reshape the flattened 1D array to match (num_nodes, 3)
-        d2 = d2.reshape(d1.shape)
-        
-        # Calcul de la norme de la différence
-        diff = np.linalg.norm(d1 - d2)
+        # Simulation : Extraction via la matrice d'indices (seulement X et Y)
+        d2 = u_sim[step][flat_indices]
 
-        #autre métrique : RMSE normalisé par la norme du signal de référence (d1)
-        # diff = d1-d2
-        # rmse = np.mean(diff**2)
-        # diff = rmse / (np.mean(d1**2) + 1e-12)
-
-        
-
-        
-
-
+        diff = (d1 - d2).flatten()
         errors.append(diff)
-        
-        #print(f"Pas {step} : Différence = {diff}")
         step += 1
-            
-    return np.sum(errors)
-    
-def compute_u_residuals(f, u_sim, base_path = "Function/displacement"):
-    """
-    Compute the total displacement difference between 
-    H5 reference raw file extracted with h5py
-    and simulation output array.
-    """
-    errors = []
-    
-    step = 0
-    for step in range(len(u_sim)):
-        d1 = f[f"{base_path}/{step}"][:]
-        d2 = u_sim[step]
-        
-        # FIX: Reshape the flattened 1D array to match (num_nodes, 3)
-        d2 = d2.reshape(d1.shape)
-        
-        # Calcul de la norme de la différence
-        diff = d1 - d2
-        diff = np.array(diff).flatten()  
 
-        #autre métrique : RMSE normalisé par la norme du signal de référence (d1)
-        # diff = d1-d2
-        # rmse = np.mean(diff**2)
-        # diff = rmse / (np.mean(d1**2) + 1e-12)
+    if step == 0:
+        raise ValueError(f"Aucun pas de temps n'a pu être lu sous le chemin {dataset_path}.")
 
-        
+    return np.concatenate(errors)
 
-        
-
-
-        errors.append(diff)
-        
-        #print(f"Pas {step} : Différence = {diff}")
-        #step += 1
-    errors = np.array(errors).flatten()  # Convertir la liste de tableaux en un seul tableau 1D        
-    return errors
-
-# with h5py.File("femu_files/donnes_ref.h5", 'r') as f:
-#     diffs = compute_u_sim_raw_h5_diff(f, u)
-#     print(f"Différence totale : {diffs}")
-
-def is_hill48_physically_valid(params):
-    # params = [E, nu, sigma_Y, Q, k, F, G, H, L, M, N]
-    F, G, H, L, M, N = params[5:11]
-    
-    # 1. Positivité stricte
-    if any(p <= 1e-6 for p in [F, G, H, L, M, N]):
-        return False
-    
-    # 2. Conditions de convexité pratique (ratios raisonnables)
-    if (F+G) <= 0 or (G+H) <= 0 or (H+F) <= 0:
-        return False
-        
-    # Évite les anisotropies trop brutales qui font exploser le solveur plastique
-    if max(F,G,H,L,M,N) / min(F,G,H,L,M,N) > 3.0:  
-        return False
-        
-    # 3. Cohérence écrouissage / élasticité
-    E, Q, k = params[0], params[3], params[4]
-    if Q * k > 0.15 * E:  
-        return False
-        
-    return True
-
-def compute_J2_raw_h5_error_from_parameters(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]): 
+def compute_J2_residuals_DIC_BC(domain,V, W, WT,f,h5_path, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]): 
     """
     Compute the total displacement difference between 
     H5 reference raw file extracted with h5py
@@ -184,15 +227,14 @@ def compute_J2_raw_h5_error_from_parameters(domain,V, W, WT,f, params = [200_000
     (E, nu, sigma_Y, Q_var, k_hardening)
     
     """
-    hill_params = dict(
+    params = dict(
     t_start     = 0.0,
     T           = 3.0,
     num_steps   = 50,
     load_amp    = 0.01,       # amplitude of the applied displacement
     length      = 10.0,       # half-length of the specimen
-    mesh_file   = "Flat_specimen_refined.msh",
-    output_dir  = "results_plasticity",
-    file_name    = "donnes_ref",
+    h5_bc_path = h5_path,
+    h5_function_path = "/Function/displacement_projected",
     # Elastic constants (used when no model is supplied)
     E           = params[0],
     nu          = params[1],
@@ -207,16 +249,16 @@ def compute_J2_raw_h5_error_from_parameters(domain,V, W, WT,f, params = [200_000
     #     raise ValueError("Hill48 non convexe ou paramètres non physiques")
 
     model = J2IsotropicHardening(
-        elastic=ElasticModel(hill_params["E"], hill_params["nu"], tdim=3),
-        sigma_Y=hill_params["sigma_Y"],
-        Q_var=hill_params["Q_var"],
-        k=hill_params["k_hardening"]
+        elastic=ElasticModel(params["E"], params["nu"], tdim=3),
+        sigma_Y=params["sigma_Y"],
+        Q_var=params["Q_var"],
+        k=params["k_hardening"]
     )
 
     try:
         # On tente de lancer la simulation dolfinx
-        _, u_sim = run_simulation_V3(domain, V, W, WT, hill_params, model=model, write_output=False)
-        error = compute_u_sim_raw_h5_diff(f, u_sim)
+        _, u_sim = run_simulation_bc_h5_fast(domain, V, W, WT, params, model=model)
+        error = compute_u_residuals_is_imported(f, u_sim,V, params["h5_function_path"])
     except RuntimeError as e:
         # Si le solveur de Newton échoue, on ne crash pas !
         print(f"--> [Newton Divergence] Paramètres instables détectés. Pénalisation de l'erreur.")
@@ -224,59 +266,7 @@ def compute_J2_raw_h5_error_from_parameters(domain,V, W, WT,f, params = [200_000
         error = 1e3
     return error
 
-
-
-def compute_J2_residuals(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]): 
-    """
-    Compute the total displacement difference between 
-    H5 reference raw file extracted with h5py
-    and simulation output array for a given set of Hill48 parameters.
-
-    params should be a list or array containing the following parameters in order:
-    (E, nu, sigma_Y, Q_var, k_hardening)
-    
-    """
-    hill_params = dict(
-    t_start     = 0.0,
-    T           = 3.0,
-    num_steps   = 50,
-    load_amp    = 0.01,       # amplitude of the applied displacement
-    length      = 10.0,       # half-length of the specimen
-    mesh_file   = "Flat_specimen_refined.msh",
-    output_dir  = "results_plasticity",
-    file_name    = "donnes_ref",
-    # Elastic constants (used when no model is supplied)
-    E           = params[0],
-    nu          = params[1],
-    # J2 isotropic hardening parameters (used when no model is supplied)
-    sigma_Y     = params[2],
-    Q_var       = params[3],
-    k_hardening = params[4],
-    )
-
-    # if not is_hill48_physically_valid(params):
-    #     print("--> [REJET PRÉ-FEM] Paramètres non physiques ou Hill48 non convexe.")
-    #     raise ValueError("Hill48 non convexe ou paramètres non physiques")
-
-    model = J2IsotropicHardening(
-        elastic=ElasticModel(hill_params["E"], hill_params["nu"], tdim=3),
-        sigma_Y=hill_params["sigma_Y"],
-        Q_var=hill_params["Q_var"],
-        k=hill_params["k_hardening"]
-    )
-
-    try:
-        # On tente de lancer la simulation dolfinx
-        _, u_sim = run_simulation_V3(domain, V, W, WT, hill_params, model=model, write_output=False)
-        error = compute_u_residuals(f, u_sim)
-    except RuntimeError as e:
-        # Si le solveur de Newton échoue, on ne crash pas !
-        print(f"--> [Newton Divergence] Paramètres instables détectés. Pénalisation de l'erreur.")
-        # On renvoie une erreur artificiellement grande pour dire à SciPy de rebrousser chemin
-        error = 1e3
-    return error
-
-def compute_hill_residuals(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.900, 0.600, 0.400, 1.7, 1.3, 1.350]):
+def compute_hill_residuals_DIC_BC(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.900, 0.600, 0.400, 1.7, 1.3, 1.350]):
     """
     Compute the total displacement difference between 
     H5 reference raw file extracted with h5py
@@ -329,7 +319,7 @@ def compute_hill_residuals(domain,V, W, WT,f, params = [200_000.0, 0.3, 100.0, 5
 
     try:
         # On tente de lancer la simulation dolfinx
-        _, u_sim = run_simulation_V3(domain, V, W, WT, hill_params,1, model=model_hill48, write_output=False)
+        _, u_sim = run_simulation_fast(domain, V, W, WT, hill_params,1, model=model_hill48, write_output=False)
         error = compute_u_residuals(f, u_sim)
     except RuntimeError as e:
         # Si le solveur de Newton échoue, on ne crash pas !
@@ -364,23 +354,12 @@ bounds_ref_J2 = [
 
 
 
-def normalize_params(params, bounds):
-    """Normalize parameters to [0, 1] range based on given bounds."""
-    return [(params[i] - bounds[i][0]) / (bounds[i][1] - bounds[i][0]) for i in range(len(bounds))]
-
-def denormalize_params(params_norm, bounds):
-    """Denormalize parameters from [0, 1] range back to original scale based on given bounds."""
-    return [params_norm[i] * (bounds[i][1] - bounds[i][0]) + bounds[i][0] for i in range(len(bounds))]  
-
-
 from datetime import datetime
 
 
 
-def femu_res_J2(
-        domain,
-        V, W, WT,
-        h5_file,
+def femu_res_J2_DIC_BC(
+        XDMF_FILE,
         params0=[200_500.0, 0.29, 102.0, 52.0, 1_010.0],
         bounds=bounds_ref_J2,
         params_names=["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
@@ -392,6 +371,12 @@ def femu_res_J2(
     params0 : liste des paramètres initiaux pour l'optimisation (E, nu, sigma_Y, Q_var, k_hardening)
     bounds : liste des tuples (min, max) pour chaque paramètre, utilisée pour la normalisation et les contraintes de l'optimiseur
     """
+    with io.XDMFFile(MPI.COMM_WORLD, XDMF_FILE, "r") as xdmf:
+        domain = xdmf.read_mesh(name="mesh")
+    V, W, WT = build_function_spaces(domain)
+
+    h5_file = XDMF_FILE.replace(".xdmf", ".h5") 
+
     # --- Configuration du Plot ---
     plt.ion()
     fig = plt.figure(figsize=(16, 10))
@@ -421,7 +406,7 @@ def femu_res_J2(
             print(f"{str(datetime.now())} \nsimu EF n°{len(history_err)}, iteration = {len(history_err)//(len(params_norm)+1)}\nCurrent params (phys): {params_phys}\n")
             
             # 2. Calcul des résidus (doit être un vecteur/array 1D pour least_squares)
-            residuals = compute_J2_residuals(domain, V, W, WT, f, params_phys)
+            residuals = compute_J2_residuals_DIC_BC(domain, V, W, WT, f, h5_file, params_phys)
             
             # 3. Calcul de la norme (scalaire) pour le suivi graphique
             # least_squares minimise (0.5 * sum(r**2)). On stocke la somme des carrés.
@@ -467,7 +452,9 @@ def femu_res_J2(
             params0_norm,
             method='trf',
             bounds=bounds_norm,
-            ftol=1e-7, gtol=1e-5, max_nfev=150, verbose=2, x_scale='jac', diff_step=1e-3
+            ftol=1e-8, gtol=1e-7, max_nfev=150, verbose=2, x_scale=1.0, diff_step=1e-2,
+            # loss='soft_l1',     # Filtre les résidus aberrants de la DIC
+            # f_scale=0.01,       # Seuil de résidu typique au-delà duquel on atténue (à ajuster)
         )
         
     plt.ioff()
@@ -480,10 +467,8 @@ def femu_res_J2(
     
     return result_phys
 
-def femu_res_hill(
-        domain,
-        V, W, WT,
-        h5_file,
+def femu_res_hill_DIC_BC(
+        XDMF_FILE,
         params0=[200_500.0, 0.29, 102.0, 52.0, 1_010.0],
         bounds=bounds_ref,
         params_names=["E", "nu", "sigma_Y", "Q_var", "k_hardening", "F", "G", "H", "L", "M", "N"]
@@ -491,10 +476,12 @@ def femu_res_hill(
     """
     domain : dolfinx.mesh.Mesh déjà créé à partir du maillage PyVista
     V, W, WT : espaces de fonctions déjà construits pour ce maillage
-    h5_file : chemin vers le fichier de référence contenant les déplacements mesurés
     params0 : liste des paramètres initiaux pour l'optimisation (E, nu, sigma_Y, Q_var, k_hardening)
     bounds : liste des tuples (min, max) pour chaque paramètre, utilisée pour la normalisation et les contraintes de l'optimiseur
     """
+    with io.XDMFFile(MPI.COMM_WORLD, XDMF_FILE, "r") as xdmf:
+        domain = xdmf.read_mesh(name="Grid")
+    V, W, WT = build_function_spaces(domain)
     # --- Configuration du Plot ---
     plt.ion()
     fig = plt.figure(figsize=(16, 10))
@@ -515,6 +502,8 @@ def femu_res_hill(
     # --- Préparation de la Normalisation pour SciPy ---
     params0_norm = normalize_params(params0, bounds)
     bounds_norm = Bounds([0.0]*len(params0), [1.0]*len(params0))
+    h5_file = XDMF_FILE.replace(".xdmf", ".h5") 
+
 
     with h5py.File(h5_file, 'r') as f:
         def objective_function(params_norm):
@@ -569,7 +558,10 @@ def femu_res_hill(
             params0_norm,
             method='trf',
             bounds=bounds_norm,
-            ftol=1e-7, gtol=1e-7, max_nfev=150, verbose=2, x_scale=1, diff_step=1e-3
+            ftol=1e-10, gtol=1e-10,   # empêche l'arrêt prématuré
+            max_nfev=150, verbose=2,
+            x_scale='jac',
+            diff_step=1e-2            # perturbation plus grande que 1e-3 pour sortir du bruit
         )
         
     plt.ioff()
@@ -585,59 +577,26 @@ def femu_res_hill(
 
 if __name__ == "__main__":
     bounds_ref_J2_centr= [
-        (199000, 201_000),   # E [MPa]
+        (150_000, 250_000),   # E [MPa]
         (0.25, 0.35),         # nu 
         (10.0, 500.0),        # sigma_Y [MPa]
         (20.0, 400.0),         # Q_var [MPa]
         (10.0, 1500.0),          # k_hardening
     ]
 
-    domain = load_and_write_mesh("Flat_specimen_refined.msh")
+    XDMF_FILE = "MAINTEST/projection_cad_temporelle_mask.xdmf"
+    #XDMF_FILE = "results/projection_cad_temporelle_mask.xdmf"
     
-    V, W, WT = build_function_spaces(domain)
     real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]
+    params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
     from random import uniform,seed
-    seed(42)  # Pour la reproductibilité
-    perturbation_percentage = 0.05  # 5% de perturbation aléatoire
+    seed(43)  # Pour la reproductibilité
+    perturbation_percentage = 0.15  # 5% de perturbation aléatoire
     normalized_result = normalize_params(real_params, bounds_ref_J2_centr)
     normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
+    normalized_disturbed = [min(max(i, 0.0), 1.0) for i in normalized_disturbed]  # Clamp entre 0 et 1
     parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2_centr)
-    optimizer_result = femu_res_J2(domain,V, W, WT,"femu_files/non_refined.h5", parameters_disturbed, bounds_ref_J2_centr)
-    params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
+    optimizer_result = femu_res_J2_DIC_BC(XDMF_FILE, bounds=bounds_ref_J2_centr, params0=parameters_disturbed,params_names = params_names)
+    
     print("Optimized parameters (phys):", optimizer_result.x)
     print("normalized error:", [f"{params_names[i]} : {round(abs(optimizer_result.x[i] - real_params[i])/abs(real_params[i])*100,5)}%" for i in range(len(real_params))])
-
-    # second_round = femu_V3(domain,V, W, WT,"femu_files/non_refined.h5", optimizer_result.x, bounds_ref_J2)
-    
-    # print("2nd Optimized parameters (phys):", second_round.x)
-    # print("2ndnormalized error:", [round(abs(second_round.x[i] - real_params[i])/abs(real_params[i])*100,2) for i in range(len(real_params))])
-
-
-# if __name__ == "__main__":
-#     bounds_ref_hill = [
-#         (180000, 220_000),   # E [MPa]
-#         (0.25, 0.35),         # nu 
-#         (10.0, 500.0),        # sigma_Y [MPa]
-#         (20.0, 400.0),         # Q_var [MPa]
-#         (10.0, 1500.0),# k_hardening
-#         (0.3, 1.3),           # F : Hill
-#         (0.3, 1.3),           # G : Hill
-#         (0.2, 1.0),           # H : Hill
-#         (0.8, 1.8),           # L : cisaillement hors-plan
-#         (0.8, 1.8),           # M : cisaillement hors-plan
-#         (0.6, 1.6),           # N : cisaillement plan      
-#     ]
-#     params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening", "F", "G", "H", "L", "M", "N"]
-#     domain = load_and_write_mesh("carre_trou.msh")
-    
-#     V, W, WT = build_function_spaces(domain)
-#     real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0, 0.9, 0.6,0.4, 1.7, 1.3, 1.35]
-#     from random import uniform,seed
-#     seed(42)  # Pour la reproductibilité
-#     perturbation_percentage = 0.05  # 5% de perturbation aléatoire
-#     normalized_result = normalize_params(real_params, bounds_ref_hill)
-#     normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
-#     parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_hill)
-#     optimizer_result = femu_res_hill(domain,V, W, WT,"femu_files/carre_trou_anisotrope_analitique.h5", parameters_disturbed, bounds_ref_hill,params_names)
-#     print("Optimized parameters (phys):", optimizer_result.x)
-#     print("normalized error:", [f"{params_names[i]} : {round(abs(optimizer_result.x[i] - real_params[i])/abs(real_params[i])*100,5)}%" for i in range(len(real_params))])
