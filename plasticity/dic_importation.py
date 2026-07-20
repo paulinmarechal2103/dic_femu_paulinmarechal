@@ -1,591 +1,91 @@
-import pandas as pd
-import numpy as np
-import pyvista as pv
-import meshio
-import dolfinx.fem as fem
-import dolfinx.io
-from mpi4py import MPI
-from numpy.typing import NDArray
-from plasticity_simu import load_and_write_mesh
-from image_calibration import calibrate_2d_manual,check_calibration_2d
-import os
-import ufl
-import skimage
-import h5py
-import basix
-from scipy.interpolate import interp1d
-from scipy.spatial import KDTree
+# --- Bibliothèque standard ---
 import glob
-import re
-
-# =========================================================================
-# 1. CONVERSION ET TRIANGULATION NETTOYÉE
-# =========================================================================
-def csv_to_fenicsx_xdmf(csv_file: str, xdmf_path: str, alpha: float = 0.2) -> None:
-    """Lit le CSV de la DIC, filtre les points valides, triangule 
-
-    et écrit le fichier XDMF en ajoutant explicitement les positions x et y.
-    """
-
-    data = pd.read_csv(csv_file)
-    names = [s.replace('"', "").replace(" ", "") for s in data.columns]
-    d = {names[i]: data.values[:, i] for i in range(len(names))}
-
-    # Masque de filtrage : points bien corrélés (u != 0 et non NaN)
-    valid_mask = (d["u"] != 0) & (~np.isnan(d["u"]))
-    
-    x_coords = d["x"][valid_mask]
-    y_coords = d["y"][valid_mask]
-    u_values = d["u"][valid_mask]
-    v_values = d["v"][valid_mask]
-
-    # 1. Construction des points géométriques (N, 3)
-    points = np.stack([x_coords, y_coords, np.zeros_like(x_coords)], axis=-1)
-    
-    # Triangulation avec PyVista
-    cloud = pv.PolyData(points)
-    volume = cloud.delaunay_2d(alpha=alpha)
-    if volume.n_cells == 0:
-        print(f"[Attention] Aucun triangle généré avec alpha={alpha}. Bascule sur Delaunay standard...")
-        volume = cloud.delaunay_2d(alpha=0.0)
-
-    # Extraction des triangles
-    faces_raw = volume.faces
-    triangles = faces_raw.reshape(-1, 4)[:, 1:]
-
-    print(f"-> Maillage créé : {len(points)} nœuds et {len(triangles)} triangles.")
-
-    # 2. Formatage de TOUTES les données en colonnes (N, 1) pour Meshio
-    u_values_2d = np.array(u_values).reshape(-1, 1)
-    v_values_2d = np.array(v_values).reshape(-1, 1)
-    x_values_2d = np.array(x_coords).reshape(-1, 1)
-    y_values_2d = np.array(y_coords).reshape(-1, 1)
-
-    # 3. Construction du maillage avec déplacements ET positions explicites
-    mesh_meshio = meshio.Mesh(
-        points=points,
-        cells=[("triangle", triangles)],
-        point_data={
-            "x": x_values_2d, # Position X initiale de la DIC rattachée au point
-            "y": y_values_2d, # Position Y initiale de la DIC rattachée au point
-            "u": u_values_2d,
-            "v": v_values_2d,
-        }
-    )
-
-    # Écriture finale (XDMF + H5)
-    meshio.write(xdmf_path, mesh_meshio)
-    print(f"[Succès] Fichier {xdmf_path} généré avec les champs ['u', 'v', 'x', 'y'].")
-
-# =========================================================================
-# 2. PERMUTATION ET CHARGEMENT DANS FENICSX
-# =========================================================================
-def permute_array(array: NDArray, perm_indices: NDArray) -> NDArray:
-    """Réaligne l'ordre du tableau avec la numérotation dolfinx."""
-    # .squeeze() transforme un tableau (N, 1) en un vecteur plat (N,)
-    array_flat = np.asarray(array).squeeze() 
-    
-    # SÉCURITÉ CRITIQUE : Si dolfinx ne fournit pas d'indices de permutation 
-    # (tableau vide), cela signifie qu'aucune permutation n'est nécessaire !
-    if perm_indices is None or perm_indices.size == 0:
-        return array_flat
-        
-    output = np.zeros_like(array_flat)
-    for i in range(len(array_flat)):
-        output[i] = array_flat[perm_indices[i]]
-    return output
-
-
-def load_mesh_and_displacement_field(xdmf_path: str):
-    """Charge le maillage et crée le champ de déplacement vectoriel u.
-
-    Compatible avec dolfinx v0.10+.
-    """
-    # A. Lecture de la géométrie par dolfinx
-    mesh_XDMF = dolfinx.io.XDMFFile(MPI.COMM_SELF, xdmf_path, "r")
-    mesh_dolfinx = mesh_XDMF.read_mesh(name="Grid")
-    mesh_dolfinx.topology.create_connectivity(
-        mesh_dolfinx.topology.dim - 1, mesh_dolfinx.topology.dim
-    )
-
-    # B. Lecture des champs par meshio
-    mesh_meshio = meshio.read(xdmf_path)
-
-    print("Champs trouvés par Meshio dans le fichier :", list(mesh_meshio.point_data.keys()))
-
-    if "u" not in mesh_meshio.point_data:
-        raise KeyError(f"Le champ 'u' est introuvable dans le fichier XDMF.")
-
-    # C. Application de la permutation sécurisée
-    global_indices = mesh_dolfinx.geometry.input_global_indices
-    permuted_ux = permute_array(mesh_meshio.point_data["u"], global_indices)
-    permuted_uy = permute_array(mesh_meshio.point_data["v"], global_indices)
-
-    # D. Création de la fonction FEniCSx (Vecteur P1 continu)
-    # Syntaxe v0.10 : fem.functionspace
-    CG1_vector = fem.functionspace(mesh_dolfinx, ("CG", 1, (2,)))
-    u_obs = fem.Function(CG1_vector, name="displacement_femu")
-
-    # E. Remplissage du tableau sous dolfinx v0.10
-    # On accède directement à .x.array qui est un tableau NumPy plat
-    u_array = u_obs.x.array
-    u_array[:] = 0.0                  # Initialisation à zéro
-    u_array[0::2] = permuted_ux       # Composantes X aux dofs pairs
-    u_array[1::2] = permuted_uy       # Composantes Y aux dofs impairs
-
-    # Partage des valeurs si calcul parallèle (remplace ghostUpdate)
-    u_obs.x.scatter_forward()
-
-    return mesh_dolfinx, u_obs
-
-import ufl
-
-def compute_strain_tensor(mesh_dolfinx, u_obs):
-    """Calcule le tenseur des déformations epsilon dans le plan (2D)
-
-    à partir d'un maillage dont les points ont 3 coordonnées.
-    """
-    # 1. Calcul du gradient complet (génère une forme 2x3)
-    grad_full = ufl.grad(u_obs)
-
-    # 2. Extraction de la sous-matrice carrée 2x2 (uniquement les dérivées par rapport à x et y)
-    # grad_full[i, j] où i est la composante de u (0 ou 1) et j est la coordonnée (0, 1 ou 2)
-    grad_2d = ufl.as_matrix([
-        [grad_full[0, 0], grad_full[0, 1]],
-        [grad_full[1, 0], grad_full[1, 1]]
-    ])
-
-    # 3. Calcul de la partie symétrique sur la matrice carrée 2x2
-    epsilon_expr_ufl = ufl.sym(grad_2d)
-
-    # 4. Création de l'espace de fonction Tensoriel 2D (matrice 2x2 à chaque nœud)
-    CG1_tensor = fem.functionspace(mesh_dolfinx, ("CG", 1, (2, 2)))
-    eps_obs = fem.Function(CG1_tensor, name="strain_tensor")
-
-    # 5. Évaluation et interpolation aux nœuds
-    local_expr = fem.Expression(epsilon_expr_ufl, CG1_tensor.element.interpolation_points)
-    eps_obs.interpolate(local_expr)
-
-    print("[Succès] Le tenseur des déformations epsilon (2D) a été calculé avec succès.")
-    return eps_obs
-
-def export_results_to_xdmf(mesh_dolfinx, u_obs, eps_obs, output_path: str):
-    """Exporte le maillage dolfinx, le champ de déplacement et le tenseur epsilon
-
-    dans un fichier XDMF pour ParaView. Compatible dolfinx v0.10.
-    """
-    # Création du fichier d'exportation avec dolfinx.io
-    with dolfinx.io.XDMFFile(mesh_dolfinx.comm, output_path, "w") as xdmf:
-        # 1. Écriture de la topologie et de la géométrie du maillage
-        # (ParaView y trouvera automatiquement les coordonnées spatiales x, y, z des nœuds)
-        xdmf.write_mesh(mesh_dolfinx)
-        
-        # 2. Écriture du champ de déplacement vectoriel u (contient u et v)
-        # On spécifie le temps t=0.0 pour initialiser la série temporelle dans ParaView
-        xdmf.write_function(u_obs, 0.0)
-        
-        # 3. Écriture du tenseur des déformations epsilon
-        xdmf.write_function(eps_obs, 0.0)
-        
-    print(f"[Succès] Les résultats ont été exportés avec succès dans : {output_path}")
-
-
-# global_coords_map servira à stocker les positions (x,y) strictes retenues au pas 1
-REFERENCE_COORDS = None 
-
-# =========================================================================
-# 1. GÉNÉRATION DU MAILLAGE DE RÉFÉRENCE (FIXÉ AU PAS 1)
-# =========================================================================
-def create_reference_mesh_from_csv(csv_file: str, alpha: float = 20.0):
-    """Lit le fichier 0001, fixe les coordonnées de référence globales,
-
-    génère la triangulation et renvoie le maillage dolfinx.
-    """
-    global REFERENCE_COORDS
-    
-    data = pd.read_csv(csv_file)
-    names = [s.replace('"', "").replace(" ", "") for s in data.columns]
-    d = {names[i]: data.values[:, i] for i in range(len(names))}
-
-    # Filtrage des points valides au pas 1 (déplacement non nul et non NaN)
-    valid_mask = (d["sigma"] != -1)
-    
-    ref_x = np.round(d["x"][valid_mask], 4)
-    ref_y = np.round(d["y"][valid_mask], 4)
-    REFERENCE_COORDS = list(zip(ref_x, ref_y))
-    
-    points = np.stack([d["x"][valid_mask], d["y"][valid_mask], np.zeros_like(d["x"][valid_mask])], axis=-1)
-    
-    # Triangulation PyVista
-    cloud = pv.PolyData(points)
-    volume = cloud.delaunay_2d(alpha=alpha)
-    if volume.n_cells == 0:
-        print(f"[Attention] Aucun triangle avec alpha={alpha}, bascule sur Delaunay standard.")
-        volume = cloud.delaunay_2d(alpha=0.0)
-
-    triangles = volume.faces.reshape(-1, 4)[:, 1:]
-    print(f"-> Maillage de référence créé : {len(points)} nœuds et {len(triangles)} triangles.")
-
-    # Passage temporaire par meshio pour instancier proprement le maillage dolfinx
-    tmp_path = "tmp_ref_mesh.xdmf"
-    mesh_meshio = meshio.Mesh(points=points, cells=[("triangle", triangles)])
-    meshio.write(tmp_path, mesh_meshio)
-
-    with dolfinx.io.XDMFFile(MPI.COMM_SELF, tmp_path, "r") as xdmf_in:
-        mesh_dolfinx = xdmf_in.read_mesh(name="Grid")
-    
-    mesh_dolfinx.topology.create_connectivity(mesh_dolfinx.topology.dim - 1, mesh_dolfinx.topology.dim)
-    
-    if os.path.exists(tmp_path): os.remove(tmp_path)
-    if os.path.exists("tmp_ref_mesh.h5"): os.remove("tmp_ref_mesh.h5")
-        
-    return mesh_dolfinx
-
-
-# =========================================================================
-# 2. MISE À JOUR ALIGNÉE SUR LE PAS DE RÉFÉRENCE
-# =========================================================================
-def update_displacement_field(csv_file: str, mesh_dolfinx, u_obs):
-    """Lit un CSV, extrait le déplacement uniquement pour les nœuds
-
-    qui correspondent aux positions du maillage de référence.
-    """
-    global REFERENCE_COORDS
-    
-    data = pd.read_csv(csv_file)
-    names = [s.replace('"', "").replace(" ", "") for s in data.columns]
-    d = {names[i]: data.values[:, i] for i in range(len(names))}
-
-    current_x = np.round(d["x"], 4)
-    current_y = np.round(d["y"], 4)
-    
-    current_data_map = {
-        (cx, cy): (cu, cv) for cx, cy, cu, cv in zip(current_x, current_y, d["u"], d["v"])
-    }
-
-    u_values = []
-    v_values = []
-    for coord in REFERENCE_COORDS:
-        if coord in current_data_map:
-            u_val, v_val = current_data_map[coord]
-            u_values.append(u_val if not np.isnan(u_val) else 0.0)
-            v_values.append(v_val if not np.isnan(v_val) else 0.0)
-        else:
-            u_values.append(0.0)
-            v_values.append(0.0)
-
-    u_values = np.array(u_values)
-    v_values = np.array(v_values)
-
-    # Permutation dolfinx standard
-    global_indices = mesh_dolfinx.geometry.input_global_indices
-    if global_indices is not None and global_indices.size > 0:
-        permuted_ux = u_values[global_indices]
-        permuted_uy = v_values[global_indices]
-    else:
-        permuted_ux = u_values
-        permuted_uy = v_values
-
-    # Injection
-    u_array = u_obs.x.array
-    u_array[0::2] = permuted_ux
-    u_array[1::2] = permuted_uy
-    u_obs.x.scatter_forward()
-
-
-def update_displacement_field_2(csv_file: str, mesh_dolfinx, u_obs, k: int = 3):
-    """Lit un CSV, extrait le déplacement et remplace les valeurs manquantes
-
-    ou NaN par une interpolation IDW (Inverse Distance Weighting) via un KDTree.
-    """
-    global REFERENCE_COORDS
-    
-    data = pd.read_csv(csv_file)
-    names = [s.replace('"', "").replace(" ", "") for s in data.columns]
-    d = {names[i]: data.values[:, i] for i in range(len(names))}
-
-    # 1. Filtrer uniquement les points VALIDES du pas actuel (non NaN et non nuls)
-    u_curr = d["u"]
-    v_curr = d["v"]
-    valid_mask = ~np.isnan(u_curr) & ~np.isnan(v_curr) & (u_curr != 0)
-    
-    # Sécurité : si aucun point n'est valide dans tout le CSV
-    if not np.any(valid_mask):
-        print(f"[Attention] Aucun point valide dans {csv_file}. Remplissage par zéros.")
-        u_values = np.zeros(len(REFERENCE_COORDS))
-        v_values = np.zeros(len(REFERENCE_COORDS))
-    else:
-        valid_coords = np.stack([d["x"][valid_mask], d["y"][valid_mask]], axis=-1)
-        valid_u = u_curr[valid_mask]
-        valid_v = v_curr[valid_mask]
-
-        # 2. Construire le KDTree avec les coordonnées valides actuelles
-        tree = KDTree(valid_coords)
-
-        # 3. Convertir les coordonnées de référence en tableau NumPy pour traitement vectoriel
-        ref_coords_arr = np.array(REFERENCE_COORDS)
-        
-        # Ajuster k si jamais on a moins de points valides que le k demandé
-        k_neighbors = min(k, len(valid_coords))
-        
-        # Chercher les k voisins les plus proches pour chaque nœud de référence
-        distances, indices = tree.query(ref_coords_arr, k=k_neighbors)
-
-        # 4. Interpolation Inverse Distance Weighting (IDW)
-        if k_neighbors == 1:
-            # Cas dégradé : un seul voisin
-            u_values = valid_u[indices]
-            v_values = valid_v[indices]
-        else:
-            # Éviter la division par zéro pour les points qui se superposent exactement
-            eps = 1e-10
-            weights = 1.0 / (distances + eps)
-            
-            # Normalisation des poids (la somme des poids pour un point doit valoir 1)
-            weights_sum = np.sum(weights, axis=1, keepdims=True)
-            weights /= weights_sum
-
-            # Calcul de la moyenne pondérée (produit scalaire matriciel pour la vitesse)
-            u_values = np.sum(valid_u[indices] * weights, axis=1)
-            v_values = np.sum(valid_v[indices] * weights, axis=1)
-
-    # 5. Permutation dolfinx standard
-    global_indices = mesh_dolfinx.geometry.input_global_indices
-    if global_indices is not None and global_indices.size > 0:
-        permuted_ux = u_values[global_indices]
-        permuted_uy = v_values[global_indices]
-    else:
-        permuted_ux = u_values
-        permuted_uy = v_values
-
-    # 6. Injection dans la fonction FEniCSx
-    u_array = u_obs.x.array
-    u_array[0::2] = permuted_ux
-    u_array[1::2] = permuted_uy
-    u_obs.x.scatter_forward()
-
-
-
-def update_strain_field_from_csv(csv_file: str, mesh_dolfinx, E_obs, k: int = 3):
-    """Lit un CSV, extrait les composantes de déformation (exx, eyy, exy) et remplace
-
-    les valeurs manquantes ou NaN par une interpolation IDW via un KDTree.
-    """
-    global REFERENCE_COORDS
-    
-    data = pd.read_csv(csv_file)
-    names = [s.replace('"', "").replace(" ", "") for s in data.columns]
-    d = {names[i]: data.values[:, i] for i in range(len(names))}
-
-    # 1. Filtrer uniquement les points VALIDES du pas actuel (non NaN pour les déformations)
-    exx_curr = d["exx"]
-    eyy_curr = d["eyy"]
-    exy_curr = d["exy"]
-    
-    # On valide les points où aucune des trois composantes n'est NaN
-    valid_mask = ~np.isnan(exx_curr) & ~np.isnan(eyy_curr) & ~np.isnan(exy_curr)
-    
-    # Sécurité : si aucun point n'est valide dans tout le CSV
-    if not np.any(valid_mask):
-        print(f"[Attention] Aucun point valide pour les déformations dans {csv_file}. Remplissage par zéros.")
-        exx_values = np.zeros(len(REFERENCE_COORDS))
-        eyy_values = np.zeros(len(REFERENCE_COORDS))
-        exy_values = np.zeros(len(REFERENCE_COORDS))
-    else:
-        valid_coords = np.stack([d["x"][valid_mask], d["y"][valid_mask]], axis=-1)
-        valid_exx = exx_curr[valid_mask]
-        valid_eyy = eyy_curr[valid_mask]
-        valid_exy = exy_curr[valid_mask]
-
-        # 2. Construire le KDTree avec les coordonnées valides actuelles
-        tree = KDTree(valid_coords)
-
-        # 3. Convertir les coordonnées de référence en tableau NumPy
-        ref_coords_arr = np.array(REFERENCE_COORDS)
-        
-        # Ajuster k si besoin
-        k_neighbors = min(k, len(valid_coords))
-        
-        # Chercher les k voisins les plus proches
-        distances, indices = tree.query(ref_coords_arr, k=k_neighbors)
-
-        # 4. Interpolation Inverse Distance Weighting (IDW)
-        if k_neighbors == 1:
-            u_ind = indices.ravel() if indices.ndim > 1 else indices
-            exx_values = valid_exx[u_ind]
-            eyy_values = valid_eyy[u_ind]
-            exy_values = valid_exy[u_ind]
-        else:
-            eps = 1e-10
-            weights = 1.0 / (distances + eps)
-            
-            weights_sum = np.sum(weights, axis=1, keepdims=True)
-            weights /= weights_sum
-
-            # Calcul de la moyenne pondérée pour chaque composante tensorielle
-            exx_values = np.sum(valid_exx[indices] * weights, axis=1)
-            eyy_values = np.sum(valid_eyy[indices] * weights, axis=1)
-            exy_values = np.sum(valid_exy[indices] * weights, axis=1)
-
-    # 5. Permutation dolfinx standard basée sur la géométrie du maillage
-    global_indices = mesh_dolfinx.geometry.input_global_indices
-    if global_indices is not None and global_indices.size > 0:
-        permuted_exx = exx_values[global_indices]
-        permuted_eyy = eyy_values[global_indices]
-        permuted_exy = exy_values[global_indices]
-    else:
-        permuted_exx = exx_values
-        permuted_eyy = eyy_values
-        permuted_exy = exy_values
-
-    # 6. Injection dans la fonction FEniCSx (Espace Tensoriel 2D -> 4 composantes par nœud)
-    # L'ordre dolfinx standard pour un tenseur (2, 2) au nœud est : [T00, T01, T10, T11]
-    # Soit : [exx, exy, eyx, eyy]
-    E_array = E_obs.x.array
-    E_array[0::4] = permuted_exx  # Composante (0,0) -> exx
-    E_array[1::4] = permuted_exy  # Composante (0,1) -> exy
-    E_array[2::4] = permuted_exy  # Composante (1,0) -> eyx (égal à exy par symétrie)
-    E_array[3::4] = permuted_eyy  # Composante (1,1) -> eyy
-    
-    E_obs.x.scatter_forward()
-# =========================================================================
-# 3. BOUCLE PRINCIPALE AVEC SÉRIE TEMPORELLE FENICSX
-# # =========================================================================
-# def process_csv_series_fenicsx(folder_path: str, output_xdmf: str, file_prefix: str, alpha: float = 0.2):
-#     """Boucle sur les fichiers CSV en utilisant le moteur dolfinx pour l'écriture
-
-#     de la série temporelle et UFL pour le calcul exact d'epsilon.
-#     """
-#     # Utilisation du pas 0001 comme référence géométrique
-#     first_csv = os.path.join(folder_path, f"{file_prefix}0001.csv")
-#     if not os.path.exists(first_csv):
-#         raise FileNotFoundError(f"Le fichier de référence initial {first_csv} est introuvable.")
-        
-#     print(f"[Info] Création du maillage de référence depuis {first_csv}...")
-#     mesh = create_reference_mesh_from_csv(first_csv, alpha=alpha)
-
-#     # Préparation des espaces fonctionnels dolfinx v0.10
-#     CG1_vector = fem.functionspace(mesh, ("CG", 1, (2,)))
-#     u_field = fem.Function(CG1_vector, name="displacement")
-
-#     CG1_tensor = fem.functionspace(mesh, ("CG", 1, (2, 2)))
-#     eps_field = fem.Function(CG1_tensor, name="strain_tensor")
-
-#     # Opérateur UFL pour Epsilon (2D + Symétrie)
-#     grad_full = ufl.grad(u_field)
-#     grad_2d = ufl.as_matrix([[grad_full[0, 0], grad_full[0, 1]], [grad_full[1, 0], grad_full[1, 1]]])
-#     epsilon_expr_ufl = ufl.sym(grad_2d)
-#     local_expr = fem.Expression(epsilon_expr_ufl, CG1_tensor.element.interpolation_points)
-
-#     print(f"[Info] Début du traitement de la série dans {output_xdmf}...")
-#     with dolfinx.io.XDMFFile(mesh.comm, output_xdmf, "w") as xdmf:
-#         # Écriture initiale obligatoire du maillage complet (non vide !)
-#         xdmf.write_mesh(mesh)
-
-#         # Traitement chronologique de la série (de 1 à 100)
-#         for step in range(0, 1237, 20):
-#             csv_name = f"{file_prefix}{step:04d}.csv"
-#             csv_path = os.path.join(folder_path, csv_name)
-
-#             if not os.path.exists(csv_path):
-#                 print(f"[Attention] Pas de temps {step} manquant ({csv_name}). Arrêt de la boucle.")
-#                 break
-
-#             t = float(step)
-
-#             # Mise à jour des valeurs et calcul d'epsilon par projection UFL
-#             update_displacement_field_2(csv_path, mesh, u_field)
-#             eps_field.interpolate(local_expr)
-
-#             # Écriture dans la structure temporelle XDMF
-#             xdmf.write_function(u_field, t)
-#             xdmf.write_function(eps_field, t)
-
-#             if step % 10 == 0:
-#                 print(f" -> Étape {step}/100 traitée ({csv_name} au temps t={t})")
-
-#     print(f"[Succès] Série temporelle complète générée avec dolfinx dans : {output_xdmf}")
-
 import os
-import dolfinx
-import ufl
-from dolfinx import fem
-
-# def process_csv_series_fenicsx(folder_path: str, output_xdmf: str, file_prefix: str, alpha: float = 0.2, ech: int = 20):
-#     """Boucle sur les fichiers CSV en utilisant dolfinx pour l'écriture de la série temporelle.
-
-#     Ne calcule et n'écrit que le champ de déplacement (displacement).
-#     S'adapte dynamiquement au nombre de fichiers présents dans le dossier.
-#     """
-#     # 1. Détection dynamique des étapes disponibles dans le dossier
-#     search_pattern = os.path.join(folder_path, f"{file_prefix}[0-9][0-9][0-9][0-9].csv")
-#     all_files = glob.glob(search_pattern)
-    
-#     if not all_files:
-#         raise FileNotFoundError(f"Aucun fichier correspondant au motif {file_prefix}XXXX.csv n'a été trouvé dans {folder_path}.")
-    
-#     # Extraction des indices numériques pour trouver le max
-#     steps = []
-#     for f in all_files:
-#         match = re.search(r"(\d{4})\.csv$", f)
-#         if match:
-#             steps.append(int(match.group(1)))
-            
-#     min_step = min(steps)
-#     max_step = max(steps)
-    
-#     # Utilisation du premier pas trouvé comme référence géométrique (généralement 0000 ou 0001)
-#     first_csv = os.path.join(folder_path, f"{file_prefix}{min_step:04d}.csv")
-#     if not os.path.exists(first_csv):
-#         raise FileNotFoundError(f"Le fichier de référence initial {first_csv} est introuvable.")
-        
-#     print(f"[Info] Fichiers trouvés : {len(all_files)} (Etapes de {min_step:04d} à {max_step:04d})")
-#     print(f"[Info] Création du maillage de référence depuis {first_csv}...")
-#     mesh = create_reference_mesh_from_csv(first_csv, alpha=alpha)
-
-#     # Préparation de l'espace fonctionnel vectoriel dolfinx v0.10
-#     CG1_vector = fem.functionspace(mesh, ("CG", 1, (2,)))
-
-#     # Déclaration du champ de déplacement uniquement
-#     u_field = fem.Function(CG1_vector, name="displacement")
-
-#     print(f"[Info] Début du traitement de la série dans {output_xdmf}...")
-#     with dolfinx.io.XDMFFile(mesh.comm, output_xdmf, "w") as xdmf:
-#         # Écriture initiale du maillage
-#         xdmf.write_mesh(mesh)
-        
-#         # Traitement chronologique de la série adapté à max_step
-#         for step in range(min_step, max_step + 1, ech):
-#             csv_name = f"{file_prefix}{step:04d}.csv"
-#             csv_path = os.path.join(folder_path, csv_name)
-
-#             if not os.path.exists(csv_path):
-#                 print(f"[Attention] Pas de temps {step} manquant ({csv_name}). Saut ou arrêt selon tes données.")
-#                 continue
-
-#             t = float(step)
-
-#             # Mise à jour du déplacement depuis le CSV
-#             update_displacement_field_2(csv_path, mesh, u_field)
-            
-#             # Écriture du champ de déplacement uniquement
-#             xdmf.write_function(u_field, t)
-#             print(f" -> Étape {step}/{max_step} traitée ({csv_name} au temps t={t})")
-
-#     print(f"[Succès] Série temporelle (déplacement seul) générée dans : {output_xdmf}")
-
+import re
 from typing import Optional
 
-def process_csv_series_fenicsx(
+# --- Calcul et manipulation de données ---
+import h5py
+import numpy as np
+import pandas as pd
+import skimage
+from numpy.typing import NDArray
+import xml.etree.ElementTree as ET
+from scipy.interpolate import interp1d,LinearNDInterpolator, NearestNDInterpolator
+from scipy.spatial import KDTree
+
+# --- Maillage, Visualisation et Éléments Finis ---
+import basix
+import dolfinx.fem as fem
+import dolfinx.io
+import meshio
+import pyvista as pv
+import ufl
+from mpi4py import MPI
+
+# --- Modules locaux ---
+from image_calibration import calibrate_2d_manual, check_calibration_2d
+from plasticity_simu import load_and_write_mesh
+
+
+def create_reference_mesh_from_csv(csv_path: str, alpha: float) -> pv.PolyData:
+    """Creates a 2D triangulated mesh from CSV coordinates using PyVista."""
+    df = pd.read_csv(csv_path)
+    
+    # Flexible matching for common coordinate column names
+    x_col = next((c for c in df.columns if c.lower() in ['x', 'pos_x', 'coord_x']), None)
+    y_col = next((c for c in df.columns if c.lower() in ['y', 'pos_y', 'coord_y']), None)
+    z_col = next((c for c in df.columns if c.lower() in ['z', 'pos_z', 'coord_z']), None)
+    
+    if not x_col or not y_col:
+        raise ValueError(f"Could not find coordinate columns (x, y) in {csv_path}. Columns: {df.columns.tolist()}")
+    
+    # PyVista points must be 3D vectors (x, y, z)
+    points = np.zeros((len(df), 3))
+    points[:, 0] = df[x_col].values
+    points[:, 1] = df[y_col].values
+    if z_col:
+        points[:, 2] = df[z_col].values
+        
+    # Build PolyData mesh and triangulate using PyVista's built-in 2D Delaunay with alpha shapes
+    poly = pv.PolyData(points)
+    mesh = poly.delaunay_2d(alpha=alpha)
+    return mesh
+
+
+def update_displacement_field_pyvista(csv_path: str, mesh: pv.PolyData):
+    """Reads displacements from CSV and assigns them directly as Point Data on the mesh."""
+    df = pd.read_csv(csv_path)
+    
+    # Flexible matching for displacement column names
+    ux_col = next((c for c in df.columns if c.lower() in ['u', 'u_x', 'disp_x']), None)
+    uy_col = next((c for c in df.columns if c.lower() in ['v', 'u_y', 'disp_y']), None)
+    uz_col = next((c for c in df.columns if c.lower() in ['w', 'u_z', 'disp_z']), None)
+    
+    if not ux_col or not uy_col:
+        raise ValueError(f"Could not find displacement columns (ux, uy) in {csv_path}. Columns: {df.columns.tolist()}")
+        
+    ux = df[ux_col].values
+    uy = df[uy_col].values
+    uz = df[uz_col].values if uz_col else np.zeros_like(ux)
+    
+    # Build 3D displacement vector field for VTK
+    disp_vectors = np.column_stack((ux, uy, uz))
+    
+    # Store the field on the mesh. Point indexing is preserved by PyVista's delaunay_2d.
+    mesh.point_data["displacement"] = disp_vectors
+
+
+def process_csv_series_pyvista(
     folder_path: str, 
-    output_xdmf: str, 
+    output_pvd: str, 
     file_prefix: str, 
     alpha: float = 0.2, 
     ech: int = 20,
     start_idx: int = 0,
     end_idx: Optional[int] = None
 ):
-    """Boucle sur les fichiers CSV en utilisant dolfinx pour l'écriture de la série temporelle.
+    """Boucle sur les fichiers CSV en utilisant PyVista pour l'écriture de la série temporelle (.pvd).
 
     Ne calcule et n'écrit que le champ de déplacement (displacement).
     S'adapte dynamiquement au nombre de fichiers présents dans le dossier,
@@ -630,861 +130,251 @@ def process_csv_series_fenicsx(
     print(f"[Info] Fichiers conservés pour traitement (après intervalle et ech={ech}) : {len(steps_to_process)} (Etapes de {min_step:04d} à {max_step:04d})")
     print(f"[Info] Création du maillage de référence depuis {first_csv}...")
     
+    # Création du maillage initial avec PyVista
     mesh = create_reference_mesh_from_csv(first_csv, alpha=alpha)
 
-    # Préparation de l'espace fonctionnel vectoriel dolfinx v0.10
-    CG1_vector = fem.functionspace(mesh, ("CG", 1, (2,)))
+    # Préparation du répertoire de sortie
+    output_dir = os.path.dirname(output_pvd) or "."
+    pvd_filename = os.path.basename(output_pvd)
+    pvd_name_no_ext, _ = os.path.splitext(pvd_filename)
+    
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    # Déclaration du champ de déplacement uniquement
-    u_field = fem.Function(CG1_vector, name="displacement")
+    print(f"[Info] Début du traitement de la série dans {output_pvd}...")
+    
+    processed_steps = []  # Utilisé pour construire le fichier de métadonnées .pvd à la fin
 
-    print(f"[Info] Début du traitement de la série dans {output_xdmf}...")
-    with dolfinx.io.XDMFFile(mesh.comm, output_xdmf, "w") as xdmf:
-        # Écriture initiale du maillage
-        xdmf.write_mesh(mesh)
+    # Traitement chronologique de la série filtrée
+    for step in steps_to_process:
+        csv_name = f"{file_prefix}{step:04d}.csv"
+        csv_path = os.path.join(folder_path, csv_name)
+
+        if not os.path.exists(csv_path):
+            print(f"[Attention] Pas de temps {step} manquant ({csv_name}). Saut.")
+            continue
+
+        t = float(step)
+
+        # 1. Mise à jour du déplacement depuis le CSV directement sur le maillage PyVista
+        update_displacement_field_pyvista(csv_path, mesh)
         
-        # Traitement chronologique de la série filtrée
-        for step in steps_to_process:
-            csv_name = f"{file_prefix}{step:04d}.csv"
-            csv_path = os.path.join(folder_path, csv_name)
+        # 2. Sauvegarde du pas de temps sous forme de fichier VTU (Unstructured/PolyData) individuel
+        vtu_filename = f"{pvd_name_no_ext}_{step:04d}.vtu"
+        vtu_path = os.path.join(output_dir, vtu_filename)
+        mesh.cast_to_unstructured_grid().save(vtu_path)
+        
+        # Enregistrement pour le fichier manifeste .pvd
+        processed_steps.append((t, vtu_filename))
+        print(f" -> Étape {step}/{max_step} traitée ({csv_name} au temps t={t})")
 
-            if not os.path.exists(csv_path):
-                print(f"[Attention] Pas de temps {step} manquant ({csv_name}). Saut.")
-                continue
+    # 3. Écriture du fichier manifeste .pvd qui unifie tous les pas de temps dans ParaView
+    with open(output_pvd, "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0"?>\n')
+        f.write('<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">\n')
+        f.write('  <Collection>\n')
+        for t, vtu_file in processed_steps:
+            f.write(f'    <DataSet timestep="{t}" group="" part="0" file="{vtu_file}"/>\n')
+        f.write('  </Collection>\n')
+        f.write('</VTKFile>\n')
 
-            t = float(step)
+    print(f"[Succès] Série temporelle (déplacement seul) générée dans : {output_pvd}")
 
-            # Mise à jour du déplacement depuis le CSV
-            update_displacement_field_2(csv_path, mesh, u_field)
-            
-            # Écriture du champ de déplacement uniquement
-            xdmf.write_function(u_field, t)
-            print(f" -> Étape {step}/{max_step} traitée ({csv_name} au temps t={t})")
-
-    print(f"[Succès] Série temporelle (déplacement seul) générée dans : {output_xdmf}")
 
 def interpolate_displacement_obs_mesh_to_cad_mesh_2D(
-    u_obs: fem.Function, u_cad: fem.Function, tform_cad_to_img_4D: NDArray
+    mesh_obs: pv.DataSet, 
+    mesh_cad: pv.DataSet, 
+    tform_cad_to_img_4D: np.ndarray
 ) -> None:
-    V_obs = u_obs.function_space
-    disp_obs_dim = V_obs.element.value_shape[0]
+    """Interpolates the 'displacement' point data from mesh_obs to mesh_cad
+    using spatial mapping and transforms the vectors back to the CAD space.
+    """
+    if "displacement" not in mesh_obs.point_data:
+        raise ValueError("The observed mesh does not contain a 'displacement' array.")
 
-    V_cad = u_cad.function_space
-    disp_cad_dim = V_cad.element.value_shape[0]
-    dim = disp_cad_dim
-    assert disp_obs_dim == dim
+    # 1. Get the spatial coordinates of the CAD mesh points
+    points_cad = mesh_cad.points  # shape (N, 3)
+    
+    # Transform CAD coordinates into the Observation (Image) Coordinate space
+    points_cad_hom = np.hstack([points_cad, np.ones((len(points_cad), 1))])
+    points_img_hom = (tform_cad_to_img_4D @ points_cad_hom.T).T
+    points_img = points_img_hom[:, :3]
 
+    # 2. Build a fast KDTree on the observed mesh points for interpolation
+    # (In 2D we map coordinates in the X-Y plane)
+    points_obs_2d = mesh_obs.points[:, :2]
+    points_img_2d = points_img[:, :2]
+    
+    tree_obs = KDTree(points_obs_2d)
+    
+    # Query nearest neighbors on the observed mesh
+    distances, indices = tree_obs.query(points_img_2d, k=1)
+
+    # Grab the closest displacements
+    disp_obs = mesh_obs.point_data["displacement"][indices]  # Shape (N, 3)
+
+    # 3. Transform the displacement vectors back from Image Space to CAD space
+    # Using the inverse jacobian (top-left 3x3 of cad_to_img, inverted)
     tform_jac_cad_to_img_3D = tform_cad_to_img_4D[:3, :3]
+    inv_jacobian = np.linalg.inv(tform_jac_cad_to_img_3D)
+    
+    # Apply rotation/scaling transform to vectors
+    disp_cad_transformed = (inv_jacobian @ disp_obs.T).T
 
-    bb_tree_obs = dolfinx.geometry.bb_tree(V_obs.mesh, 2)
-    midpoint_tree = dolfinx.geometry.create_midpoint_tree(
-        V_obs.mesh,
-        2,
-        np.arange(V_obs.mesh.topology.index_map(2).size_local, dtype=np.int32),
-    )
-
-    def _u_cad_expr(x: NDArray) -> NDArray:
-        x_4D = np.concatenate([x, [np.ones_like(x[0])]])
-        x_img_4D = tform_cad_to_img_4D @ x_4D
-        x_img = x_img_4D[:3, :]
-
-        cell_candidates = dolfinx.geometry.compute_collisions_points(bb_tree_obs, x_img.T)
-        cells = dolfinx.geometry.compute_colliding_cells(V_obs.mesh, cell_candidates, x_img.T)
-        closest_entity = dolfinx.geometry.compute_closest_entity(bb_tree_obs, midpoint_tree, V_obs.mesh, x_img.T)
-
-        selected_cells = closest_entity
-        disp_eval = u_obs.eval(x_img.T, selected_cells)
-
-        disp_eval_scaled = np.linalg.inv(tform_jac_cad_to_img_3D) @ np.concatenate(
-            [disp_eval.T, [np.zeros_like(disp_eval.T[0])]]
-        )
-
-        # CORRECTION ICI : on coupe à 'dim' (2 ou 3) pour respecter l'espace cible
-        return disp_eval_scaled[:dim]
-
-    u_cad.interpolate(_u_cad_expr)
+    # Save directly back to the CAD mesh point data
+    mesh_cad.point_data["displacement_projected"] = disp_cad_transformed
 
 
-import xml.etree.ElementTree as ET
+import meshio
 
-def project_h5_series_to_cad_mesh(
-    h5_path: str, 
-    mesh_cad: dolfinx.mesh.Mesh, 
-    tform_h5_to_cad_4D: NDArray, 
-    output_xdmf_path: str
+def read_msh_safely(msh_path: str) -> pv.UnstructuredGrid:
+    mesh = meshio.read(msh_path)
+    mesh.cell_sets = {}
+    pv_mesh = pv.from_meshio(mesh)
+    
+    # --- AJOUT : Ne conserver que les tétraèdres (Type 10) ---
+    # VTK_TETRA est le type 10
+    pv_mesh = pv_mesh.extract_cells(pv_mesh.celltypes == 10)
+    
+    return pv_mesh
+
+def project_vtu_series_to_cad_mesh_mask(
+    input_pvd_path: str, 
+    mesh_cad_path: str, 
+    tform_h5_to_cad_4D: np.ndarray, 
+    output_pvd_path: str
 ) -> None:
-    """Lit une série temporelle FEniCSx directement depuis son fichier H5 (via h5py),
-    reconstruit le maillage source et projette le champ de déplacement vectoriel
-    sur un maillage cible dolfinx.mesh.Mesh pour chaque pas de temps.
+    """Reads a time series of PyVista VTU/PVD meshes containing displacements,
+    reconstructs the geometry, projects/transforms the vectors onto a masked sub-region 
+    of a CAD mesh, and writes a new PyVista temporal PVD/VTU series.
     """
     # =========================================================================
-    # 1. PARSING DE LA STRUCTURE ET DES PAS DE TEMPS
+    # 1. PARSING INPUT PVD / IDENTIFYING TIMESTEPS
     # =========================================================================
-    xdmf_path = h5_path.replace(".h5", ".xdmf")
-    steps = []
-    geom_path = "/Mesh/Grid/geometry"
-    topo_path = "/Mesh/Grid/topology"
+    print(f"[1/4] Parsing input PVD metadata: {input_pvd_path}")
+    if not os.path.exists(input_pvd_path):
+        raise FileNotFoundError(f"Input PVD file {input_pvd_path} not found.")
 
-    if os.path.exists(xdmf_path):
-        print(f"[1/4] Analyse du fichier métadonnées {xdmf_path} pour identifier les datasets...")
-        tree = ET.parse(xdmf_path)
-        root = tree.getroot()
-        
-        try:
-            geom_path = next(root.iter("Geometry")).find("DataItem").text.split(":")[-1].strip()
-            topo_path = next(root.iter("Topology")).find("DataItem").text.split(":")[-1].strip()
-        except Exception:
-            pass 
+    input_dir = os.path.dirname(input_pvd_path) or "."
+    steps = [] # Will hold tuples of (time, absolute_vtu_path)
 
-        for grid in root.findall(".//Grid"):
-            time_node = grid.find("Time")
-            attr_node = grid.find(".//Attribute[@Name='displacement']")
-            if time_node is not None and attr_node is not None:
-                t_val = float(time_node.get("Value"))
-                di = attr_node.find("DataItem")
-                if di is not None:
-                    ds_path = di.text.split(":")[-1].strip()
-                    steps.append((t_val, ds_path))
-    else:
-        print(f"[1/4] Fichier XDMF non trouvé. Inspection directe du fichier H5 : {h5_path}")
-        with h5py.File(h5_path, "r") as f:
-            mesh_key = list(f["Mesh"].keys())[0]
-            geom_path = f"/Mesh/{mesh_key}/geometry"
-            topo_path = f"/Mesh/{mesh_key}/topology"
-            func_group = f["Function/displacement"]
-            for k in sorted(list(func_group.keys()), key=lambda x: int(x) if x.isdigit() else x):
-                try:
-                    t_val = float(k)
-                except ValueError:
-                    t_val = float(len(steps))
-                steps.append((t_val, f"Function/displacement/{k}"))
+    tree = ET.parse(input_pvd_path)
+    root = tree.getroot()
+    for dataset in root.findall(".//DataSet"):
+        timestep = float(dataset.get("timestep"))
+        vtu_rel_path = dataset.get("file")
+        vtu_abs_path = os.path.join(input_dir, vtu_rel_path)
+        steps.append((timestep, vtu_abs_path))
 
     if not steps:
-        raise ValueError("Aucun pas de temps ou champ de déplacement n'a pu être localisé.")
+        raise ValueError("No timesteps could be located in the input PVD file.")
     
     steps.sort(key=lambda x: x[0])
-    print(f" -> {len(steps)} pas de temps détectés.")
-    # =========================================================================
-    # 2. CHARGEMENT DU MAILLAGE SOURCE DEPUIS LE H5 ET INSTANCIATION DOLFINX
-    # =========================================================================
-    print(f"[2/4] Extraction des tableaux de maillage depuis le H5...")
-    with h5py.File(h5_path, "r") as f:
-        points_obs = f[geom_path][:]
-        cells_obs = f[topo_path][:]
+    print(f" -> {len(steps)} timesteps successfully identified.")
 
-    # FIX 1 : shape=(3,) définit proprement la dimension géométrique (gdim=3) pour UFL
-    coord_element = basix.ufl.element("Lagrange", "triangle", 1, shape=(3,))
-    domain_obs = ufl.Mesh(coord_element)
+    # =========================================================================
+    # 2. CHARGEMENT DU MAILLAGE CAD ET CALCUL DES MASQUES
+    # =========================================================================
+    print(f"[2/4] Loading CAD reference mesh: {mesh_cad_path}")
     
-    # FIX 2 : Mots-clés nommés explicites pour contourner l'inversion d'arguments v0.9/v0.10
-    mesh_obs = dolfinx.mesh.create_mesh(
-        MPI.COMM_SELF, 
-        cells=cells_obs, 
-        x=points_obs, 
-        e=domain_obs
-    )
-    mesh_obs.topology.create_connectivity(mesh_obs.topology.dim - 1, mesh_obs.topology.dim)
-
-    # Initialisation des espaces de fonction (Déplacement 2D)
-    dim_disp = 2
-    V_obs = fem.functionspace(mesh_obs, ("CG", 1, (dim_disp,)))
-    u_obs = fem.Function(V_obs, name="displacement")
-    global_indices_obs = mesh_obs.geometry.input_global_indices
-
-    # Préparation de l'espace sur le maillage cible (CAD) reçu en argument
-    V_cad = fem.functionspace(mesh_cad, ("CG", 1, (dim_disp,)))
-    u_cad = fem.Function(V_cad, name="displacement_projected")
-
-    # 3. Définition du seuil de distance (ex: si la DIC a un pas de 2mm, un seuil à 2.0 ou 3.0 mm est cohérent)
-    DISTANCE_THRESHOLD = 2.0  # À ajuster selon la taille de tes mailles DIC
-
-    # =========================================================================
-    # 3. TRANSFORMATION DE COORDONNÉES (INVERSION)
-    # =========================================================================
-    print("[3/4] Inversion de la matrice de transformation spatiale...")
-    tform_cad_to_img_4D = np.linalg.inv(tform_h5_to_cad_4D)
-
-    # =========================================================================
-    # 4. BOUCLE TEMPORELLE DE LECTURE H5 ET PROJECTION
-    # =========================================================================
-    print(f"[4/4] Lancement de la projection temporelle brute vers : {output_xdmf_path}")
-    
-    with dolfinx.io.XDMFFile(mesh_cad.comm, output_xdmf_path, "w") as xdmf_out:
-        xdmf_out.write_mesh(mesh_cad)
-
-        with h5py.File(h5_path, "r") as f:
-            i = 0
-            for t, ds_path in steps:
-                data_step = f[ds_path][:]
-                
-                ux = np.nan_to_num(data_step[:, 0], nan=0.0)
-                uy = np.nan_to_num(data_step[:, 1], nan=0.0)
-
-                if global_indices_obs is not None and global_indices_obs.size > 0:
-                    permuted_ux = ux[global_indices_obs]
-                    permuted_uy = uy[global_indices_obs]
-                else:
-                    permuted_ux = ux
-                    permuted_uy = uy
-
-                u_obs_array = u_obs.x.array
-                u_obs_array[0::2] = permuted_ux
-                u_obs_array[1::2] = permuted_uy
-                u_obs.x.scatter_forward()
-
-                # Appel à ta fonction externe d'interpolation géométrique
-                interpolate_displacement_obs_mesh_to_cad_mesh_2D(u_obs, u_cad, tform_cad_to_img_4D)
-
-                xdmf_out.write_function(u_cad, i)
-                i+=1
-                print(f" -> Pas t={t} projeté avec succès.")
-
-    print(f"[Succès] Série temporelle complète exportée.")
-
-def project_h5_series_to_cad_mesh_mask(
-    h5_path: str, 
-    mesh_cad: dolfinx.mesh.Mesh, 
-    tform_h5_to_cad_4D: NDArray, 
-    output_xdmf_path: str
-) -> None:
-    """Lit une série temporelle FEniCSx directement depuis son fichier H5 (via h5py),
-    reconstruit le maillage source et projette le champ de déplacement vectoriel
-    sur un maillage cible dolfinx.mesh.Mesh pour chaque pas de temps.
-    
-    Ajoute également une étiquette scalaire 'is_imported' (0 ou 1) sur le maillage CAD.
-    """
-    # =========================================================================
-    # 1. PARSING DE LA STRUCTURE ET DES PAS DE TEMPS
-    # =========================================================================
-    xdmf_path = h5_path.replace(".h5", ".xdmf")
-    steps = []
-    geom_path = "/Mesh/Grid/geometry"
-    topo_path = "/Mesh/Grid/topology"
-
-    if os.path.exists(xdmf_path):
-        print(f"[1/4] Analyse du fichier métadonnées {xdmf_path} pour identifier les datasets...")
-        tree = ET.parse(xdmf_path)
-        root = tree.getroot()
-        
-        try:
-            geom_path = next(root.iter("Geometry")).find("DataItem").text.split(":")[-1].strip()
-            topo_path = next(root.iter("Topology")).find("DataItem").text.split(":")[-1].strip()
-        except Exception:
-            pass 
-
-        for grid in root.findall(".//Grid"):
-            time_node = grid.find("Time")
-            attr_node = grid.find(".//Attribute[@Name='displacement']")
-            if time_node is not None and attr_node is not None:
-                t_val = float(time_node.get("Value"))
-                di = attr_node.find("DataItem")
-                if di is not None:
-                    ds_path = di.text.split(":")[-1].strip()
-                    steps.append((t_val, ds_path))
+    if mesh_cad_path.lower().endswith(".msh"):
+        mesh_cad = read_msh_safely(mesh_cad_path)
     else:
-        print(f"[1/4] Fichier XDMF non trouvé. Inspection directe du fichier H5 : {h5_path}")
-        with h5py.File(h5_path, "r") as f:
-            mesh_key = list(f["Mesh"].keys())[0]
-            geom_path = f"/Mesh/{mesh_key}/geometry"
-            topo_path = f"/Mesh/{mesh_key}/topology"
-            func_group = f["Function/displacement"]
-            for k in sorted(list(func_group.keys()), key=lambda x: int(x) if x.isdigit() else x):
-                try:
-                    t_val = float(k)
-                except ValueError:
-                    t_val = float(len(steps))
-                steps.append((t_val, f"Function/displacement/{k}"))
-
-    if not steps:
-        raise ValueError("Aucun pas de temps ou champ de déplacement n'a pu être localisé.")
+        mesh_cad = pv.read(mesh_cad_path)
     
-    steps.sort(key=lambda x: x[0])
-    print(f" -> {len(steps)} pas de temps détectés.")
+    # Read the first timestep's mesh geometry to determine physical bounds
+    first_obs_mesh = pv.read(steps[0][1])
+    points_obs = first_obs_mesh.points
 
-    # =========================================================================
-    # 2. CHARGEMENT DU MAILLAGE SOURCE DEPUIS LE H5 ET INSTANCIATION DOLFINX
-    # =========================================================================
-    print(f"[2/4] Extraction des tableaux de maillage depuis le H5...")
-    with h5py.File(h5_path, "r") as f:
-        points_obs = f[geom_path][:]
-        cells_obs = f[topo_path][:]
+    # Transform observed points into CAD space to find the bounding region
+    points_hom = np.hstack([points_obs, np.ones((points_obs.shape[0], 1))])
+    points_obs_in_cad = (tform_h5_to_cad_4D @ points_hom.T).T[:, :3]
 
-    coord_element = basix.ufl.element("Lagrange", "triangle", 1, shape=(3,))
-    domain_obs = ufl.Mesh(coord_element)
-    
-    mesh_obs = dolfinx.mesh.create_mesh(
-        MPI.COMM_SELF, 
-        cells=cells_obs, 
-        x=points_obs, 
-        e=domain_obs
-    )
-    mesh_obs.topology.create_connectivity(mesh_obs.topology.dim - 1, mesh_obs.topology.dim)
-
-    # Initialisation des espaces de fonction (Déplacement 2D)
-    dim_disp = 2
-    V_obs = fem.functionspace(mesh_obs, ("CG", 1, (dim_disp,)))
-    u_obs = fem.Function(V_obs, name="displacement")
-    global_indices_obs = mesh_obs.geometry.input_global_indices
-
-    # Préparation de l'espace sur le maillage cible (CAD) reçu en argument
-    V_cad = fem.functionspace(mesh_cad, ("CG", 1, (dim_disp,)))
-    u_cad = fem.Function(V_cad, name="displacement_projected")
-    
-    # Seuil de distance pour valider si un point reçoit une donnée H5
-    DISTANCE_THRESHOLD = 2.0  
-
-    # =========================================================================
-    # NOUVEAU : CALCUL GÉOMÉTRIQUE DE L'ÉTIQUETTE (MASQUE STATIQUE)
-    # =========================================================================
-    print("[Mise à jour] Calcul de l'étiquette géométrique 'is_imported' (Cylindre Z)...")
-    if points_obs.shape[1] == 2:
-        points_3d = np.hstack([points_obs, np.zeros((points_obs.shape[0], 1))])
-    else:
-        points_3d = points_obs[:, :3]
-        
-    points_hom = np.hstack([points_3d, np.ones((points_3d.shape[0], 1))])
-    points_obs_in_cad_space = (tform_h5_to_cad_4D @ points_hom.T).T[:, :3]
-
-    # CHANGEMENT 1 : On ne garde que X et Y pour projeter sur le plan (O, X, Y)
-    points_obs_2d = points_obs_in_cad_space[:, :2]
+    # Build KDTree using CAD-space projected coordinates
+    points_obs_2d = points_obs_in_cad[:, :2]
     tree_obs_2d = KDTree(points_obs_2d)
 
-    V_mask = fem.functionspace(mesh_cad, ("CG", 1))
-    u_mask = fem.Function(V_mask, name="is_imported")
+    # Query nearest neighbors for CAD cell centers to find active regions
+    cell_centers = mesh_cad.cell_centers().points
+    DISTANCE_THRESHOLD = 1.0
 
-    # Seuil de distance (le rayon du cylindre)
-    DISTANCE_THRESHOLD = 2.0  
+    distances, _ = tree_obs_2d.query(cell_centers[:, :2], distance_upper_bound=DISTANCE_THRESHOLD)
+    cell_mask_initial = distances <= DISTANCE_THRESHOLD
 
-    def mask_interpolation_callback(x):
-        # x a une forme (3, num_points_cad) -> [x_cad, y_cad, z_cad]
-        # CHANGEMENT 2 : On ignore x[2, :] (le Z du CAD) pour la requête
-        nodes_cad_2d = x[:2, :].T
-        
-        # La distance calculée ici est purement en 2D (dans le plan XY)
-        distances, _ = tree_obs_2d.query(nodes_cad_2d, distance_upper_bound=DISTANCE_THRESHOLD)
-        
-        return np.where(distances <= DISTANCE_THRESHOLD, 1.0, 0.0)
-
-    u_mask.interpolate(mask_interpolation_callback)
-    u_mask.x.scatter_forward()
-    mask_values = u_mask.x.array
-    # 1. On évalue le masque au centre de chaque cellule (Approximation DG0)
-    tdim = mesh_cad.topology.dim
-    fdim = tdim - 1
-
-    # Trouver la connectivité Cellules -> Facettes
-    mesh_cad.topology.create_connectivity(tdim, fdim)
-    mesh_cad.topology.create_connectivity(fdim, tdim)
-
-    cell_to_facets = mesh_cad.topology.connectivity(tdim, fdim)
-    facet_to_cells = mesh_cad.topology.connectivity(fdim, tdim)
-
-    # Calculer une valeur par cellule (moyenne des sommets de la cellule)
-    cell_to_vertices = mesh_cad.topology.connectivity(tdim, 0)
-    num_cells = mesh_cad.topology.index_map(tdim).size_local + mesh_cad.topology.index_map(tdim).num_ghosts
-
-    cell_values = np.zeros(num_cells)
-    for cell in range(num_cells):
-        vertices = cell_to_vertices.links(cell)
-        cell_values[cell] = 1.0 if np.mean(mask_values[vertices]) > 0.5 else 0.0
-
-    # 2. Une facette est sur le contour si elle sépare une cellule à 1 d'une cellule à 0
-    boundary_facets = []
-    num_facets = mesh_cad.topology.index_map(fdim).size_local + mesh_cad.topology.index_map(fdim).num_ghosts
-
-    for facet in range(num_facets):
-        cells = facet_to_cells.links(facet)
-        
-        if len(cells) == 2:
-            # Facette interne : sépare deux cellules
-            val1 = cell_values[cells[0]]
-            val2 = cell_values[cells[1]]
-            if val1 != val2: # L'une est à 1, l'autre à 0
-                boundary_facets.append(facet)
-        elif len(cells) == 1:
-            # Facette sur la frontière physique du maillage CAD
-            val = cell_values[cells[0]]
-            if val == 1.0: 
-                # Si la zone importée touche le bord du CAD, c'est aussi un contour
-                boundary_facets.append(facet)
-
-    # 3. Création du MeshTag
-    boundary_facets = np.array(boundary_facets, dtype=np.int32)
-    values = np.full_like(boundary_facets, 1, dtype=np.int32) # Tag "1" pour le contour
-
-    contour_meshtags = dolfinx.mesh.meshtags(mesh_cad, fdim, boundary_facets, values)
-    contour_meshtags.name = "contour_is_imported"
-    # =========================================================================
-    # 3. TRANSFORMATION DE COORDONNÉES (INVERSION)
-    # =========================================================================
-    print("[3/4] Inversion de la matrice de transformation spatiale...")
-    tform_cad_to_img_4D = np.linalg.inv(tform_h5_to_cad_4D)
-
-    # =========================================================================
-    # 4. BOUCLE TEMPORELLE DE LECTURE H5 ET PROJECTION
-    # =========================================================================
-    print(f"[4/4] Lancement de la projection temporelle brute vers : {output_xdmf_path}")
-    
-    with dolfinx.io.XDMFFile(mesh_cad.comm, output_xdmf_path, "w") as xdmf_out:
-        xdmf_out.write_mesh(mesh_cad)
-
-        R_h5_to_cad = tform_h5_to_cad_4D[:3, :3]
-
-        with h5py.File(h5_path, "r") as f:
-            for t, ds_path in steps:
-                data_step = f[ds_path][:]
-                num_nodes = data_step.shape[0]
-                
-                # 1. On crée un tableau 3D pour les déplacements d'origine [Ux, Uy, 0]
-                disp_orig_3d = np.zeros((num_nodes, 3))
-                disp_orig_3d[:, :2] = data_step[:, :2]
-                
-                # 2. Transformation des vecteurs par la matrice 3x3 (Rotation + Échelle)
-                # (R_h5_to_cad @ disp_orig_3d.T).T permet d'opérer efficacement sur tous les nœuds d'un coup
-                disp_transformed_3d = (R_h5_to_cad @ disp_orig_3d.T).T
-                
-                # 3. Extraction des nouvelles composantes et gestion des NaNs
-                ux = np.nan_to_num(disp_transformed_3d[:, 0], nan=0.0)
-                uy = np.nan_to_num(disp_transformed_3d[:, 1], nan=0.0)
-
-                # [Le reste de ton code de permutation et d'affectation reste inchangé]
-                if global_indices_obs is not None and global_indices_obs.size > 0:
-                    permuted_ux = ux[global_indices_obs]
-                    permuted_uy = uy[global_indices_obs]
-                else:
-                    permuted_ux = ux
-                    permuted_uy = uy
-
-                u_obs_array = u_obs.x.array
-                u_obs_array[0::2] = permuted_ux
-                u_obs_array[1::2] = permuted_uy
-                u_obs.x.scatter_forward()
-
-                # Interpolation vers le maillage CAD
-                interpolate_displacement_obs_mesh_to_cad_mesh_2D(u_obs, u_cad, tform_cad_to_img_4D)
-
-                xdmf_out.write_function(u_cad, t)
-                xdmf_out.write_function(u_mask, t)
-                mesh_cad.topology.create_connectivity(fdim, tdim)
-                xdmf_out.write_meshtags(contour_meshtags, mesh_cad.geometry)
-                print(f" -> Pas t={t} projeté avec succès.")
-
-    print(f"[Succès] Série temporelle complète exportée.")
-
-def project_h5_series_to_cad_mesh_mask_2(
-    h5_path: str, 
-    mesh_cad: dolfinx.mesh.Mesh, 
-    tform_h5_to_cad_4D: NDArray, 
-    output_xdmf_path: str
-) -> None:
-    """Lit une série temporelle FEniCSx directement depuis son fichier H5 (via h5py),
-    reconstruit le maillage source et projette le champ de déplacement vectoriel
-    sur un maillage cible dolfinx.mesh.Mesh pour chaque pas de temps.
-    
-    Calcule et exporte également le sous-maillage volumique (tétraèdres) de la zone interpolée.
-    """
-    # =========================================================================
-    # 1. PARSING DE LA STRUCTURE ET DES PAS DE TEMPS
-    # =========================================================================
-    xdmf_path = h5_path.replace(".h5", ".xdmf")
-    steps = []
-    geom_path = "/Mesh/Grid/geometry"
-    topo_path = "/Mesh/Grid/topology"
-
-    if os.path.exists(xdmf_path):
-        print(f"[1/4] Analyse du fichier métadonnées {xdmf_path} pour identifier les datasets...")
-        tree = ET.parse(xdmf_path)
-        root = tree.getroot()
-        
-        try:
-            geom_path = next(root.iter("Geometry")).find("DataItem").text.split(":")[-1].strip()
-            topo_path = next(root.iter("Topology")).find("DataItem").text.split(":")[-1].strip()
-        except Exception:
-            pass 
-
-        for grid in root.findall(".//Grid"):
-            time_node = grid.find("Time")
-            attr_node = grid.find(".//Attribute[@Name='displacement']")
-            if time_node is not None and attr_node is not None:
-                t_val = float(time_node.get("Value"))
-                di = attr_node.find("DataItem")
-                if di is not None:
-                    ds_path = di.text.split(":")[-1].strip()
-                    steps.append((t_val, ds_path))
-    else:
-        print(f"[1/4] Fichier XDMF non trouvé. Inspection directe du fichier H5 : {h5_path}")
-        with h5py.File(h5_path, "r") as f:
-            mesh_key = list(f["Mesh"].keys())[0]
-            geom_path = f"/Mesh/{mesh_key}/geometry"
-            topo_path = f"/Mesh/{mesh_key}/topology"
-            func_group = f["Function/displacement"]
-            for k in sorted(list(func_group.keys()), key=lambda x: int(x) if x.isdigit() else x):
-                try:
-                    t_val = float(k)
-                except ValueError:
-                    t_val = float(len(steps))
-                steps.append((t_val, f"Function/displacement/{k}"))
-
-    if not steps:
-        raise ValueError("Aucun pas de temps ou champ de déplacement n'a pu être localisé.")
-    
-    steps.sort(key=lambda x: x[0])
-    print(f" -> {len(steps)} pas de temps détectés.")
-
-    # =========================================================================
-    # 2. CHARGEMENT DU MAILLAGE SOURCE DEPUIS LE H5 ET INSTANCIATION DOLFINX
-    # =========================================================================
-    print(f"[2/4] Extraction des tableaux de maillage depuis le H5...")
-    with h5py.File(h5_path, "r") as f:
-        points_obs = f[geom_path][:]
-        cells_obs = f[topo_path][:]
-
-    coord_element = basix.ufl.element("Lagrange", "triangle", 1, shape=(3,))
-    domain_obs = ufl.Mesh(coord_element)
-    
-    mesh_obs = dolfinx.mesh.create_mesh(
-        MPI.COMM_SELF, 
-        cells=cells_obs, 
-        x=points_obs, 
-        e=domain_obs
-    )
-    mesh_obs.topology.create_connectivity(mesh_obs.topology.dim - 1, mesh_obs.topology.dim)
-
-    dim_disp = 2
-    V_obs = fem.functionspace(mesh_obs, ("CG", 1, (dim_disp,)))
-    u_obs = fem.Function(V_obs, name="displacement")
-    global_indices_obs = mesh_obs.geometry.input_global_indices
-
-    V_cad = fem.functionspace(mesh_cad, ("CG", 1, (dim_disp,)))
-    u_cad = fem.Function(V_cad, name="displacement_projected")
-    
-    # =========================================================================
-    # CONFIGURATION DU MASQUE ET SÉLECTION DES CELLULES
-    # =========================================================================
-    print("[Mise à jour] Calcul de l'étiquette géométrique 'is_imported' (Cylindre Z)...")
-    if points_obs.shape[1] == 2:
-        points_3d = np.hstack([points_obs, np.zeros((points_obs.shape[0], 1))])
-    else:
-        points_3d = points_obs[:, :3]
-        
-    points_hom = np.hstack([points_3d, np.ones((points_3d.shape[0], 1))])
-    points_obs_in_cad_space = (tform_h5_to_cad_4D @ points_hom.T).T[:, :3]
-
-    points_obs_2d = points_obs_in_cad_space[:, :2]
-    tree_obs_2d = KDTree(points_obs_2d)
-
-    # Utilisation de DG0 : une valeur par cellule
-    V_cell = fem.functionspace(mesh_cad, ("DG", 0))
-    u_mask_cell = fem.Function(V_cell, name="is_imported_cell")
-    DISTANCE_THRESHOLD = 2.0  
-
-    def cell_mask_interpolation_callback(x):
-        nodes_cad_2d = x[:2, :].T
-        distances, _ = tree_obs_2d.query(nodes_cad_2d, distance_upper_bound=DISTANCE_THRESHOLD)
-        return np.where(distances <= DISTANCE_THRESHOLD, 1.0, 0.0)
-
-    u_mask_cell.interpolate(cell_mask_interpolation_callback)
-    u_mask_cell.x.scatter_forward()
-    cell_values = u_mask_cell.x.array  
-
-    # Récupération de la dimension topologique du maillage CAD (3 pour des tétraèdres)
-    tdim = mesh_cad.topology.dim
-
-    # Identification directe des indices des cellules se trouvant dans la zone d'intérêt
-    cell_indices = np.where(cell_values == 1.0)[0].astype(np.int32)
-
-    # Création de MeshTags au niveau des cellules (optionnel, pour l'écrire dans le XDMF principal)
-    volume_meshtags = dolfinx.mesh.meshtags(mesh_cad, tdim, cell_indices, np.full_like(cell_indices, 1, dtype=np.int32))
-    volume_meshtags.name = "zone_interet_volume"
-
-    # Si vous avez besoin de stocker u_mask en CG1 pour l'affichage continu
-    V_mask_cg1 = fem.functionspace(mesh_cad, ("CG", 1))
-    u_mask = fem.Function(V_mask_cg1, name="is_imported")
-    def cg1_mask_callback(x):
-        nodes_cad_2d = x[:2, :].T
-        distances, _ = tree_obs_2d.query(nodes_cad_2d, distance_upper_bound=DISTANCE_THRESHOLD)
-        return np.where(distances <= DISTANCE_THRESHOLD, 1.0, 0.0)
-    u_mask.interpolate(cg1_mask_callback)
-    u_mask.x.scatter_forward()
-
-    # =========================================================================
-    # 3. TRANSFORMATION DE COORDONNÉES (INVERSION)
-    # =========================================================================
-    print("[3/4] Inversion de la matrice de transformation spatiale...")
-    tform_cad_to_img_4D = np.linalg.inv(tform_h5_to_cad_4D)
-
-    # =========================================================================
-    # 4. BOUCLE TEMPORELLE DE LECTURE H5 ET PROJECTION
-    # =========================================================================
-    print(f"[4/4] Lancement de la projection temporelle brute vers : {output_xdmf_path}")
-    
-    with dolfinx.io.XDMFFile(mesh_cad.comm, output_xdmf_path, "w") as xdmf_out:
-        xdmf_out.write_mesh(mesh_cad)
-        # On écrit les meshtags volumiques une seule fois au début
-        xdmf_out.write_meshtags(volume_meshtags, mesh_cad.geometry)
-
-        R_h5_to_cad = tform_h5_to_cad_4D[:3, :3]
-
-        with h5py.File(h5_path, "r") as f:
-            for t, ds_path in steps:
-                data_step = f[ds_path][:]
-                num_nodes = data_step.shape[0]
-                
-                disp_orig_3d = np.zeros((num_nodes, 3))
-                disp_orig_3d[:, :2] = data_step[:, :2]
-                
-                disp_transformed_3d = (R_h5_to_cad @ disp_orig_3d.T).T
-                
-                ux = np.nan_to_num(disp_transformed_3d[:, 0], nan=0.0)
-                uy = np.nan_to_num(disp_transformed_3d[:, 1], nan=0.0)
-
-                if global_indices_obs is not None and global_indices_obs.size > 0:
-                    permuted_ux = ux[global_indices_obs]
-                    permuted_uy = uy[global_indices_obs]
-                else:
-                    permuted_ux = ux
-                    permuted_uy = uy
-
-                u_obs_array = u_obs.x.array
-                u_obs_array[0::2] = permuted_ux
-                u_obs_array[1::2] = permuted_uy
-                u_obs.x.scatter_forward()
-
-                # Interpolation externe personnalisée vers le maillage CAD
-                interpolate_displacement_obs_mesh_to_cad_mesh_2D(u_obs, u_cad, tform_cad_to_img_4D)
-
-                xdmf_out.write_function(u_cad, t)
-                xdmf_out.write_function(u_mask, t)
-                print(f" -> Pas t={t} projeté avec succès.")
-
-    # =========================================================================
-    # EXPORT DU SOUS-MAILLAGE DÉDIÉ POUR LE VOLUME DE L'INTERSECTION
-    # =========================================================================
-    print("[Nouveau] Extraction et export du sous-maillage volumique de la zone d'intérêt...")
-    
-    try:
-        # Extraction du sous-maillage à partir de tdim (dimension 3 -> tétraèdres)
-        submesh_volume = dolfinx.mesh.create_submesh(
-            mesh_cad, 
-            tdim, 
-            cell_indices
-        )[0]
-        
-        # Définition du chemin d'accès pour le fichier volumique isolé
-        volume_xdmf_path = output_xdmf_path.replace(".xdmf", "_volume_interet.xdmf")
-        
-        # Écriture du maillage tétraédrique seul
-        with dolfinx.io.XDMFFile(mesh_cad.comm, volume_xdmf_path, "w") as xdmf_vol:
-            xdmf_vol.write_mesh(submesh_volume)
-        print(f" -> Sous-maillage volumique exporté avec succès dans : {volume_xdmf_path}")
-        
-    except Exception as e:
-        print(f"[Erreur] Impossible de créer ou d'exporter le sous-maillage volumique : {e}")
-
-def project_h5_series_to_cad_mesh_mask_3(
-    h5_path: str, 
-    mesh_cad: dolfinx.mesh.Mesh, 
-    tform_h5_to_cad_4D: NDArray, 
-    output_xdmf_path: str
-) -> None:
-    """Lit une série temporelle FEniCSx directement depuis son fichier H5 (via h5py),
-    reconstruit le maillage source et projette le champ de déplacement vectoriel
-    uniquement sur le sous-maillage volumique de la zone interpolée (tranches Y complètes), puis l'exporte.
-    """
-    # =========================================================================
-    # 1. PARSING DE LA STRUCTURE ET DES PAS DE TEMPS
-    # =========================================================================
-    xdmf_path = h5_path.replace(".h5", ".xdmf")
-    steps = []
-    geom_path = "/Mesh/Grid/geometry"
-    topo_path = "/Mesh/Grid/topology"
-
-    if os.path.exists(xdmf_path):
-        print(f"[1/4] Analyse du fichier métadonnées {xdmf_path} pour identifier les datasets...")
-        tree = ET.parse(xdmf_path)
-        root = tree.getroot()
-        
-        try:
-            geom_path = next(root.iter("Geometry")).find("DataItem").text.split(":")[-1].strip()
-            topo_path = next(root.iter("Topology")).find("DataItem").text.split(":")[-1].strip()
-        except Exception:
-            pass 
-
-        for grid in root.findall(".//Grid"):
-            time_node = grid.find("Time")
-            attr_node = grid.find(".//Attribute[@Name='displacement']")
-            if time_node is not None and attr_node is not None:
-                t_val = float(time_node.get("Value"))
-                di = attr_node.find("DataItem")
-                if di is not None:
-                    ds_path = di.text.split(":")[-1].strip()
-                    steps.append((t_val, ds_path))
-    else:
-        print(f"[1/4] Fichier XDMF non trouvé. Inspection directe du fichier H5 : {h5_path}")
-        with h5py.File(h5_path, "r") as f:
-            mesh_key = list(f["Mesh"].keys())[0]
-            geom_path = f"/Mesh/{mesh_key}/geometry"
-            topo_path = f"/Mesh/{mesh_key}/topology"
-            func_group = f["Function/displacement"]
-            for k in sorted(list(func_group.keys()), key=lambda x: int(x) if x.isdigit() else x):
-                try:
-                    t_val = float(k)
-                except ValueError:
-                    t_val = float(len(steps))
-                steps.append((t_val, f"Function/displacement/{k}"))
-
-    if not steps:
-        raise ValueError("Aucun pas de temps ou champ de déplacement n'a pu être localisé.")
-    
-    steps.sort(key=lambda x: x[0])
-    print(f" -> {len(steps)} pas de temps détectés.")
-
-    # =========================================================================
-    # 2. CHARGEMENT DU MAILLAGE SOURCE DEPUIS LE H5 ET INSTANCIATION DOLFINX
-    # =========================================================================
-    print(f"[2/4] Extraction des tableaux de maillage depuis le H5...")
-    with h5py.File(h5_path, "r") as f:
-        points_obs = f[geom_path][:]
-        cells_obs = f[topo_path][:]
-
-    coord_element = basix.ufl.element("Lagrange", "triangle", 1, shape=(3,))
-    domain_obs = ufl.Mesh(coord_element)
-    
-    mesh_obs = dolfinx.mesh.create_mesh(
-        MPI.COMM_SELF, 
-        cells=cells_obs, 
-        x=points_obs, 
-        e=domain_obs
-    )
-    mesh_obs.topology.create_connectivity(mesh_obs.topology.dim - 1, mesh_obs.topology.dim)
-
-    dim_disp = 2
-    V_obs = fem.functionspace(mesh_obs, ("CG", 1, (dim_disp,)))
-    u_obs = fem.Function(V_obs, name="displacement")
-    global_indices_obs = mesh_obs.geometry.input_global_indices
-
-    # =========================================================================
-    # CONFIGURATION DU MASQUE ET SÉLECTION DES CELLULES (TRANCHES EN Y)
-    # =========================================================================
-    print("[Mise à jour] Calcul de l'étiquette géométrique 'is_imported' (Cylindre Z)...")
-    if points_obs.shape[1] == 2:
-        points_3d = np.hstack([points_obs, np.zeros((points_obs.shape[0], 1))])
-    else:
-        points_3d = points_obs[:, :3]
-        
-    points_hom = np.hstack([points_3d, np.ones((points_3d.shape[0], 1))])
-    points_obs_in_cad_space = (tform_h5_to_cad_4D @ points_hom.T).T[:, :3]
-
-    points_obs_2d = points_obs_in_cad_space[:, :2]
-    tree_obs_2d = KDTree(points_obs_2d)
-
-    # Utilisation de DG0 sur le maillage CAD initial pour filtrer les cellules
-    V_cell = fem.functionspace(mesh_cad, ("DG", 0))
-    u_mask_cell = fem.Function(V_cell, name="is_imported_cell")
-    DISTANCE_THRESHOLD = 1  
-
-    def cell_mask_interpolation_callback(x):
-        nodes_cad_2d = x[:2, :].T
-        distances, _ = tree_obs_2d.query(nodes_cad_2d, distance_upper_bound=DISTANCE_THRESHOLD)
-        return np.where(distances <= DISTANCE_THRESHOLD, 1.0, 0.0)
-
-    # Premier passage pour identifier la zone d'impact en Y
-    u_mask_cell.interpolate(cell_mask_interpolation_callback)
-    u_mask_cell.x.scatter_forward()
-    cell_values = u_mask_cell.x.array  
-
-    tdim = mesh_cad.topology.dim
-    cell_indices_initial = np.where(cell_values == 1.0)[0].astype(np.int32)
-
-    # Extension de la sélection à tous les éléments des mêmes étages (X, Z)
-    if len(cell_indices_initial) > 0:
-        dg0_coords = V_cell.tabulate_dof_coordinates()
-        active_y = dg0_coords[cell_indices_initial, 1]
+    # Extend selection along the full width of the Y slices matching bounds
+    if np.any(cell_mask_initial):
+        active_y = cell_centers[cell_mask_initial, 1]
         y_min, y_max = np.min(active_y), np.max(active_y)
         
-        print(f"[Nouveau] Extension du sous-maillage sur toute la largeur (X, Z) pour Y ∈ [{y_min:.2f}, {y_max:.2f}]")
+        print(f" -> Extending active CAD submesh along Y range: [{y_min:.2f}, {y_max:.2f}]")
         
-        all_y = dg0_coords[:, 1]
-        tol = 1e-5  
-        cell_indices = np.where((all_y >= y_min - tol) & (all_y <= y_max + tol))[0].astype(np.int32)
+        # Identify all cells residing inside this Y window
+        tol = 1e-5
+        cell_mask_extended = (cell_centers[:, 1] >= y_min - tol) & (cell_centers[:, 1] <= y_max + tol)
+        cell_indices = np.where(cell_mask_extended)[0]
     else:
-        cell_indices = np.array([], dtype=np.int32)
+        raise ValueError("No matching cells found on CAD mesh within the spatial distance threshold.")
+
+    # Extract the physical CAD submesh volumetrically
+    submesh_volume = mesh_cad.extract_cells(cell_indices)
+
+    # Compute static 2D proximity mask to save as 'is_imported' (0.1 inside boundary, 0.0 outside)
+    submesh_points_2d = submesh_volume.points[:, :2]
+    submesh_distances, _ = tree_obs_2d.query(submesh_points_2d, distance_upper_bound=DISTANCE_THRESHOLD)
+    is_imported_mask = np.where(submesh_distances <= DISTANCE_THRESHOLD, 0.1, 0.0)
+    submesh_volume.point_data["is_imported"] = is_imported_mask
 
     # =========================================================================
-    # EXTRACTION DU SOUS-MAILLAGE VOLUMIQUE DE LA ZONE D'INTÉRÊT
+    # 3. INVERTING SYSTEM TRANSFORMS
     # =========================================================================
-    print("[Nouveau] Extraction du sous-maillage volumique...")
-    submesh_volume, entity_map, geom_map, ghost_map = dolfinx.mesh.create_submesh(
-        mesh_cad, 
-        tdim, 
-        cell_indices
-    )
-    
-    # Instanciation des espaces de fonction directement SUR LE SOUS-MAILLAGE
-    V_sub_cad = fem.functionspace(submesh_volume, ("CG", 1, (dim_disp,)))
-    u_sub_cad = fem.Function(V_sub_cad, name="displacement_projected")
-    
-    V_sub_mask = fem.functionspace(submesh_volume, ("CG", 1))
-    u_sub_mask = fem.Function(V_sub_mask, name="is_imported")
-    
-    # Le masque final re-évalue localement la distance pour garder le filtre initial (0 ou 1)
-    def cg1_mask_callback(x):
-        nodes_cad_2d = x[:2, :].T
-        distances, _ = tree_obs_2d.query(nodes_cad_2d, distance_upper_bound=DISTANCE_THRESHOLD)
-        return np.where(distances <= DISTANCE_THRESHOLD, 0.1, 0.0)
-    u_sub_mask.interpolate(cg1_mask_callback)
-    u_sub_mask.x.scatter_forward()
-
-    # =========================================================================
-    # 3. TRANSFORMATION DE COORDONNÉES (INVERSION)
-    # =========================================================================
-    print("[3/4] Inversion de la matrice de transformation spatiale...")
+    print("[3/4] Inverting spatial transformation matrices...")
     tform_cad_to_img_4D = np.linalg.inv(tform_h5_to_cad_4D)
 
     # =========================================================================
-    # 4. BOUCLE TEMPORELLE DE LECTURE H5 ET PROJECTION SUR LE SUBMESH
+    # 4. TEMPORAL PROJECTION AND SAVING NEW SERIES
     # =========================================================================
-    print(f"[4/4] Lancement de la projection temporelle brute vers le sous-maillage : {output_xdmf_path}")
+    output_dir = os.path.dirname(output_pvd_path) or "."
+    pvd_filename = os.path.basename(output_pvd_path)
+    pvd_name_no_ext, _ = os.path.splitext(pvd_filename)
     
-    with dolfinx.io.XDMFFile(submesh_volume.comm, output_xdmf_path, "w") as xdmf_out:
-        xdmf_out.write_mesh(submesh_volume)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-        R_h5_to_cad = tform_h5_to_cad_4D[:3, :3]
+    print(f"[4/4] Projecting timesteps onto CAD submesh -> saving to {output_pvd_path}")
+    
+    processed_steps = []
 
-        with h5py.File(h5_path, "r") as f:
-            i = 0
-            for t, ds_path in steps:
-                data_step = f[ds_path][:]
-                num_nodes = data_step.shape[0]
-                
-                disp_orig_3d = np.zeros((num_nodes, 3))
-                disp_orig_3d[:, :2] = data_step[:, :2]
-                
-                disp_transformed_3d = (R_h5_to_cad @ disp_orig_3d.T).T
-                
-                ux = np.nan_to_num(disp_transformed_3d[:, 0], nan=0.0)
-                uy = np.nan_to_num(disp_transformed_3d[:, 1], nan=0.0)
+    for i, (t, vtu_file_path) in enumerate(steps):
+        # Load timestep observation dataset
+        obs_step_mesh = pv.read(vtu_file_path)
 
-                if global_indices_obs is not None and global_indices_obs.size > 0:
-                    permuted_ux = ux[global_indices_obs]
-                    permuted_uy = uy[global_indices_obs]
-                else:
-                    permuted_ux = ux
-                    permuted_uy = uy
+        # Interpolate displacement variables to CAD submesh
+        interpolate_displacement_obs_mesh_to_cad_mesh_2D(
+            mesh_obs=obs_step_mesh,
+            mesh_cad=submesh_volume,
+            tform_cad_to_img_4D=tform_cad_to_img_4D
+        )
 
-                u_obs_array = u_obs.x.array
-                u_obs_array[0::2] = permuted_ux
-                u_obs_array[1::2] = permuted_uy
-                u_obs.x.scatter_forward()
+        # Save this step as a standalone .vtu file
+        vtu_out_name = f"{pvd_name_no_ext}_{i:04d}.vtu"
+        vtu_out_path = os.path.join(output_dir, vtu_out_name)
+        submesh_volume.save(vtu_out_path)
 
-                # Interpolation vers le sous-maillage CAD élargi
-                interpolate_displacement_obs_mesh_to_cad_mesh_2D(u_obs, u_sub_cad, tform_cad_to_img_4D)
+        processed_steps.append((t, vtu_out_name))
+        print(f" -> Time t={t:.2f} successfully projected.")
 
-                # Écriture des champs sur le sous-maillage
-                xdmf_out.write_function(u_sub_cad, i)
-                xdmf_out.write_function(u_sub_mask, i)
-                i += 1
-                print(f" -> Pas t={t} projeté sur le sous-maillage avec succès.")
+    # Save final unifying PVD index file
+    with open(output_pvd_path, "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0"?>\n')
+        f.write('<VTKFile type="Collection" version="0.1" byte_order="LittleEndian">\n')
+        f.write('  <Collection>\n')
+        for t_val, relative_vtu_file in processed_steps:
+            f.write(f'    <DataSet timestep="{t_val}" group="" part="0" file="{relative_vtu_file}"/>\n')
+        f.write('  </Collection>\n')
+        f.write('</VTKFile>\n')
+
+    print(f"[Success] Time series successfully generated: {output_pvd_path}")
+
 
 def resample_h5_time_series(
     input_h5_path: str,
@@ -1618,29 +508,27 @@ def resample_h5_time_series(
     print(f"[Succès] Nouveau fichier temporel généré avec succès ({target_num_steps} pas).")
 
 
+
+# if __name__ == "__main__":
+#     dossier_csv = "/home/pmarechal/Documents/synthetic_csv/fenicsx_surface_z0_csv"
+#     file_prefix = "FE_z0_step_"
+
+#     process_csv_series_pyvista(
+#         folder_path=dossier_csv, 
+#         output_pvd="MAINTEST/pyvista_exports/csv_imports/dic_series.pvd", 
+#         file_prefix=file_prefix, 
+#         alpha=20.0,
+#         ech=1,
+#         start_idx = 0,
+#         end_idx = 52,
+#     )
+
+
+
 if __name__ == "__main__":
+
     import os
 
-    # =========================================================================
-    # 1. CONFIGURATION DES CHEMINS (À MODIFIER)
-    # =========================================================================
-    # Mettez ici les vrais chemins vers vos fichiers de test
-    H5_FILE = "dic_series_complete.h5"
-    GMSH_FILE = "astar_6mm.xdmf"
-    OUTPUT_XDMF = "results/projection_cad_temporelle_mask.xdmf"
-    
-    # Paramètre alpha pour la triangulation Delaunay du nuage de points DIC
-    ALPHA_TRIANGULATION = 20.0 
-    domain = load_and_write_mesh(GMSH_FILE)
-    # =========================================================================
-    # 2. CONFIGURATION DE LA MATRICE DE TRANSFORMATION (H5 -> CAD)
-    # =========================================================================
-    ref_image = skimage.io.imread("N_E_basler_0000.tif", as_gray=True)
-    tform_cad_to_img_4d = calibrate_2d_manual(domain,ref_image)
-    tform_h5_to_cad = np.linalg.inv(tform_cad_to_img_4d)
-    # Astuce : Si vous avez une translation connue (ex: +10mm en X et -5mm en Y) :
-    # tform_h5_to_cad[0, 3] = 10.0
-    # tform_h5_to_cad[1, 3] = -5.0
 
     # =========================================================================
     # 3. SÉCURITÉ ET LANCEMENT DU TRAITEMENT
@@ -1649,36 +537,27 @@ if __name__ == "__main__":
     print("  VÉRIFICATION ET LANCEMENT DE LA PROJECTION TEMPORELLE")
     print("=" * 60)
 
-    if not os.path.exists(H5_FILE):
-        print(f"[Erreur] Le fichier source H5 est introuvable : {H5_FILE}")
-        print("-> Veuillez corriger la variable 'H5_FILE'.")
+    try:
+        # Exécution de la fonction globale de traitement
+        project_vtu_series_to_cad_mesh_mask(
+            input_pvd_path = "MAINTEST/pyvista_exports/csv_imports/dic_series.pvd", 
+            mesh_cad_path="Flat_specimen_refined.msh", 
+            tform_h5_to_cad_4D = np.identity(4), 
+            output_pvd_path = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd"
+        )
+        print("\n" + "=" * 60)
+        print("[Succès] Traitement terminé sans accroc.")
+        print(f"[Aide] Vous pouvez maintenant ouvrir dans ParaView")
+        print("       pour visualiser le déplacement projeté sur la CAO au cours du temps.")
+        print("=" * 60)
         
-    elif not os.path.exists(GMSH_FILE):
-        print(f"[Erreur] Le fichier cible Gmsh (.msh) est introuvable : {GMSH_FILE}")
-        print("-> Veuillez corriger la variable 'GMSH_FILE'.")
-        
-    else:
-        print(f"[OK] Fichier H5 trouvé : {H5_FILE}")
-        print(f"[OK] Fichier Gmsh trouvé : {GMSH_FILE}")
-        print(f"[Info] Fichier de sortie prévu : {OUTPUT_XDMF}\n")
-        
-        try:
-            # Exécution de la fonction globale de traitement
-            project_h5_series_to_cad_mesh_mask_3(
-                h5_path=H5_FILE,
-                mesh_cad=domain,
-                tform_h5_to_cad_4D=tform_h5_to_cad,
-                output_xdmf_path=OUTPUT_XDMF
-            )
-            print("\n" + "=" * 60)
-            print("[Succès] Traitement terminé sans accroc.")
-            print(f"[Aide] Vous pouvez maintenant ouvrir '{OUTPUT_XDMF}' dans ParaView")
-            print("       pour visualiser le déplacement projeté sur la CAO au cours du temps.")
-            print("=" * 60)
-            
-        except Exception as e:
-            print("\n" + "!" * 60)
-            print("[Échec] Une erreur est survenue pendant l'interpolation :")
-            print("!" * 60)
-            import traceback
-            traceback.print_exc()
+    except Exception as e:
+        print("\n" + "!" * 60)
+        print("[Échec] Une erreur est survenue pendant l'interpolation :")
+        print("!" * 60)
+        import traceback
+        traceback.print_exc()
+
+
+
+
