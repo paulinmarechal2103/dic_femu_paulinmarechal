@@ -245,8 +245,8 @@ def project_vtu_series_to_cad_mesh_mask(
     output_pvd_path: str
 ) -> None:
     """Reads a time series of PyVista VTU/PVD meshes containing displacements,
-    reconstructs the geometry, projects/transforms the vectors onto a masked sub-region 
-    of a CAD mesh, and writes a new PyVista temporal PVD/VTU series.
+    reconstructs the geometry, projects/transforms the vectors onto the full
+    CAD mesh, tags imported points via 'is_imported', and writes a new PyVista temporal PVD/VTU series.
     """
     # =========================================================================
     # 1. PARSING INPUT PVD / IDENTIFYING TIMESTEPS
@@ -256,7 +256,7 @@ def project_vtu_series_to_cad_mesh_mask(
         raise FileNotFoundError(f"Input PVD file {input_pvd_path} not found.")
 
     input_dir = os.path.dirname(input_pvd_path) or "."
-    steps = [] # Will hold tuples of (time, absolute_vtu_path)
+    steps = []  # Will hold tuples of (time, absolute_vtu_path)
 
     tree = ET.parse(input_pvd_path)
     root = tree.getroot()
@@ -273,7 +273,7 @@ def project_vtu_series_to_cad_mesh_mask(
     print(f" -> {len(steps)} timesteps successfully identified.")
 
     # =========================================================================
-    # 2. CHARGEMENT DU MAILLAGE CAD ET CALCUL DES MASQUES
+    # 2. CHARGEMENT DU MAILLAGE CAD ET CALCUL DU MASQUE IS_IMPORTED
     # =========================================================================
     print(f"[2/4] Loading CAD reference mesh: {mesh_cad_path}")
     
@@ -286,43 +286,17 @@ def project_vtu_series_to_cad_mesh_mask(
     first_obs_mesh = pv.read(steps[0][1])
     points_obs = first_obs_mesh.points
 
-    # Transform observed points into CAD space to find the bounding region
+    # Transform observed points into CAD space
     points_hom = np.hstack([points_obs, np.ones((points_obs.shape[0], 1))])
     points_obs_in_cad = (tform_h5_to_cad_4D @ points_hom.T).T[:, :3]
 
     # Build KDTree using CAD-space projected coordinates
-    points_obs_2d = points_obs_in_cad[:, :2]
-    tree_obs_2d = KDTree(points_obs_2d)
+    tree_obs_2d = KDTree(points_obs_in_cad[:, :2])
 
-    # Query nearest neighbors for CAD cell centers to find active regions
-    cell_centers = mesh_cad.cell_centers().points
+    # Compute static 2D proximity mask directly on the full CAD mesh points
     DISTANCE_THRESHOLD = 1.0
-
-    distances, _ = tree_obs_2d.query(cell_centers[:, :2], distance_upper_bound=DISTANCE_THRESHOLD)
-    cell_mask_initial = distances <= DISTANCE_THRESHOLD
-
-    # Extend selection along the full width of the Y slices matching bounds
-    if np.any(cell_mask_initial):
-        active_y = cell_centers[cell_mask_initial, 1]
-        y_min, y_max = np.min(active_y), np.max(active_y)
-        
-        print(f" -> Extending active CAD submesh along Y range: [{y_min:.2f}, {y_max:.2f}]")
-        
-        # Identify all cells residing inside this Y window
-        tol = 1e-5
-        cell_mask_extended = (cell_centers[:, 1] >= y_min - tol) & (cell_centers[:, 1] <= y_max + tol)
-        cell_indices = np.where(cell_mask_extended)[0]
-    else:
-        raise ValueError("No matching cells found on CAD mesh within the spatial distance threshold.")
-
-    # Extract the physical CAD submesh volumetrically
-    submesh_volume = mesh_cad.extract_cells(cell_indices)
-
-    # Compute static 2D proximity mask to save as 'is_imported' (0.1 inside boundary, 0.0 outside)
-    submesh_points_2d = submesh_volume.points[:, :2]
-    submesh_distances, _ = tree_obs_2d.query(submesh_points_2d, distance_upper_bound=DISTANCE_THRESHOLD)
-    is_imported_mask = np.where(submesh_distances <= DISTANCE_THRESHOLD, 0.1, 0.0)
-    submesh_volume.point_data["is_imported"] = is_imported_mask
+    cad_distances, _ = tree_obs_2d.query(mesh_cad.points[:, :2], distance_upper_bound=DISTANCE_THRESHOLD)
+    mesh_cad.point_data["is_imported"] = np.where(cad_distances <= DISTANCE_THRESHOLD, 0.1, 0.0)
 
     # =========================================================================
     # 3. INVERTING SYSTEM TRANSFORMS
@@ -340,7 +314,7 @@ def project_vtu_series_to_cad_mesh_mask(
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    print(f"[4/4] Projecting timesteps onto CAD submesh -> saving to {output_pvd_path}")
+    print(f"[4/4] Projecting timesteps onto full CAD mesh -> saving to {output_pvd_path}")
     
     processed_steps = []
 
@@ -348,17 +322,17 @@ def project_vtu_series_to_cad_mesh_mask(
         # Load timestep observation dataset
         obs_step_mesh = pv.read(vtu_file_path)
 
-        # Interpolate displacement variables to CAD submesh
+        # Interpolate displacement variables to full CAD mesh
         interpolate_displacement_obs_mesh_to_cad_mesh_2D(
             mesh_obs=obs_step_mesh,
-            mesh_cad=submesh_volume,
+            mesh_cad=mesh_cad,
             tform_cad_to_img_4D=tform_cad_to_img_4D
         )
 
         # Save this step as a standalone .vtu file
         vtu_out_name = f"{pvd_name_no_ext}_{i:04d}.vtu"
         vtu_out_path = os.path.join(output_dir, vtu_out_name)
-        submesh_volume.save(vtu_out_path)
+        mesh_cad.save(vtu_out_path)
 
         processed_steps.append((t, vtu_out_name))
         print(f" -> Time t={t:.2f} successfully projected.")
@@ -374,7 +348,6 @@ def project_vtu_series_to_cad_mesh_mask(
         f.write('</VTKFile>\n')
 
     print(f"[Success] Time series successfully generated: {output_pvd_path}")
-
 
 def resample_h5_time_series(
     input_h5_path: str,

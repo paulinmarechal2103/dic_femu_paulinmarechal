@@ -98,206 +98,102 @@ def get_vtu_files_from_pvd(pvd_file_path):
         
     return vtu_files
 
-def dirichlet_bcs_from_vtu(domain, space, vtu_file_path, field_name="displacement_projected", loading_axis=1):
+
+def dirichlet_bcs(domain, space, disp_value_up, disp_value_down, tol=1e-6):
     """
-    Construit les CL de Dirichlet sur les surfaces hautes et basses via l'orientation des normales.
-    Correction : Les composantes X et Y sont interpolées à partir du VTU 2D, tandis que le déplacement
-    hors-plan Z est laissé LIBRE. Un point unique est bloqué en Z pour éliminer le mode rigide.
+    Applique les vecteurs de déplacement imposés sur les bords haut et bas.
+
+    Parameters
+    ----------
+    domain          : dolfinx.mesh.Mesh
+    space           : fem.FunctionSpace (espace vectoriel V)
+    disp_value_up   : array-like 3D - [ux, uy, uz] pour le bord supérieur
+    disp_value_down : array-like 3D - [ux, uy, uz] pour le bord inférieur
+    tol             : float - tolérance géométrique
     """
-    tdim = domain.topology.dim
-    fdim = tdim - 1
-    gdim = domain.geometry.dim
+    fdim = domain.topology.dim - 1
+    bs = space.dofmap.index_map_bs  # 2 en 2D, 3 en 3D
 
-    domain.topology.create_connectivity(fdim, tdim)
-    domain.topology.create_connectivity(fdim, 0) # Facette -> Sommets
-    
-    boundary_facets = mesh.exterior_facet_indices(domain.topology)
-    f_to_v = domain.topology.connectivity(fdim, 0)
-    geom_x = domain.geometry.x[:, :gdim]
+    # Conversion en numpy array et tronquage selon la dimension du problème (bs)
+    vec_up   = np.asarray(disp_value_up, dtype=PETSc.ScalarType)[:bs]
+    vec_down = np.asarray(disp_value_down, dtype=PETSc.ScalarType)[:bs]
 
-    top_facets_list = []
-    bottom_facets_list = []
+    # Auto-détection des bornes géométriques selon l'axe Y (index 1)
+    y_coords = domain.geometry.x[:, 1]
+    y_min, y_max = np.min(y_coords), np.max(y_coords)
 
-    for facet in boundary_facets:
-        verts = f_to_v.links(facet)
-        nodes = geom_x[verts]
-        
-        if tdim == 3 and len(nodes) >= 3:
-            v1 = nodes[1] - nodes[0]
-            v2 = nodes[2] - nodes[0]
-            n = np.cross(v1, v2)
-        elif tdim == 2 and len(nodes) >= 2:
-            v = nodes[1] - nodes[0]
-            n = np.array([-v[1], v[0]])
-        else:
-            continue
-            
-        n_norm = np.linalg.norm(n)
-        if n_norm > 1e-12:
-            n /= n_norm
-        else:
-            continue
-        
-        if np.abs(n[loading_axis]) > 1e-6:
-            if n[loading_axis] > 0:
-                top_facets_list.append(facet)
-            else:
-                bottom_facets_list.append(facet)
+    # Localisation des facettes
+    down_facets = dolfinx.mesh.locate_entities_boundary(
+        domain, fdim, lambda x: x[1] <= (y_min + tol)
+    )
+    up_facets = dolfinx.mesh.locate_entities_boundary(
+        domain, fdim, lambda x: x[1] >= (y_max - tol)
+    )
 
-    top_facets = np.array(top_facets_list, dtype=np.int32)
-    bottom_facets = np.array(bottom_facets_list, dtype=np.int32)
+    # Création des objets fem.Constant
+    c_down = fem.Constant(domain, vec_down)
+    c_up   = fem.Constant(domain, vec_up)
 
-    # --- 2. Lecture et initialisation de l'interpolation depuis le VTU ---
-    import meshio
-    from scipy.interpolate import LinearNDInterpolator
-    from scipy.spatial import cKDTree
-    
-    try:
-        m = meshio.read(vtu_file_path)
-    except Exception as e:
-        raise RuntimeError(f"Erreur lecture fichier {vtu_file_path}: {e}")
-
-    points_parent = m.points[:, :gdim]
-    vtu_data = m.point_data[field_name]
-
-    interpolator = LinearNDInterpolator(points_parent, vtu_data)
-    tree = cKDTree(points_parent)
-
-    # --- 3. Séparation par composante (X et Y) ---
-    Vx, _ = space.sub(0).collapse()
-    Vy, _ = space.sub(1).collapse()
-
-    top_dofs_x = fem.locate_dofs_topological((space.sub(0), Vx), fdim, top_facets)
-    top_dofs_y = fem.locate_dofs_topological((space.sub(1), Vy), fdim, top_facets)
-    
-    bottom_dofs_x = fem.locate_dofs_topological((space.sub(0), Vx), fdim, bottom_facets)
-    bottom_dofs_y = fem.locate_dofs_topological((space.sub(1), Vy), fdim, bottom_facets)
-
-    ux_bc = fem.Function(Vx)
-    uy_bc = fem.Function(Vy)
-
-    # Interpolation aux coordonnées des degrés de liberté de l'espace effondré
-    coords_dofs = Vx.tabulate_dof_coordinates()[:, :gdim]
-    ux_values = interpolator(coords_dofs)[:, 0]
-    uy_values = interpolator(coords_dofs)[:, 1]
-
-    # Gestion des NaNs éventuels en périphérie (via plus proches voisins)
-    if np.isnan(ux_values).any():
-        nan_mask = np.isnan(ux_values)
-        _, backup_indices = tree.query(coords_dofs[nan_mask])
-        ux_values[nan_mask] = vtu_data[backup_indices, 0]
-
-    if np.isnan(uy_values).any():
-        nan_mask = np.isnan(uy_values)
-        _, backup_indices = tree.query(coords_dofs[nan_mask])
-        uy_values[nan_mask] = vtu_data[backup_indices, 1]
-
-    ux_bc.x.array[:] = ux_values
-    uy_bc.x.array[:] = uy_values
-    ux_bc.x.scatter_forward()
-    uy_bc.x.scatter_forward()
-
-    # Génération des CLs uniquement sur X (sub(0)) et Y (sub(1))
-    bc_top_x = fem.dirichletbc(ux_bc, top_dofs_x, space.sub(0))
-    bc_top_y = fem.dirichletbc(uy_bc, top_dofs_y, space.sub(1))
-    
-    bc_bottom_x = fem.dirichletbc(ux_bc, bottom_dofs_x, space.sub(0))
-    bc_bottom_y = fem.dirichletbc(uy_bc, bottom_dofs_y, space.sub(1))
-
-    bcs = [bc_top_x, bc_top_y, bc_bottom_x, bc_bottom_y]
-
-    # --- 4. Blocage du mode rigide de translation suivant Z ---
-    if gdim == 3:
-        Vz, _ = space.sub(2).collapse()
-        if len(bottom_facets) > 0:
-            pin_facet = np.array([bottom_facets[0]], dtype=np.int32)
-        else:
-            pin_facet = np.array([boundary_facets[0]], dtype=np.int32)
-            
-        dof_pin_z = fem.locate_dofs_topological((space.sub(2), Vz), fdim, pin_facet)
-        
-        # CORRECTION ICI : Utilisation d'une Function dédiée sur l'espace effondré Vz
-        uz_bc = fem.Function(Vz)
-        uz_bc.x.array[:] = 0.0
-        
-        bc_z_pin = fem.dirichletbc(uz_bc, dof_pin_z, space.sub(2))
-        bcs.append(bc_z_pin)
-
-    return bcs
+    bc_down = fem.dirichletbc(
+        c_down,
+        fem.locate_dofs_topological(space, fdim, down_facets),
+        space
+    )
+    bc_up = fem.dirichletbc(
+        c_up,
+        fem.locate_dofs_topological(space, fdim, up_facets),
+        space
+    )
+    return [bc_down, bc_up]
 
 
-def estimate_boundary_tol(domain, safety_factor=1.5):
-    """
-    Estime une tolérance de capture des DOFs de bord basée sur la taille
-    locale des éléments au bord du maillage.
-    """
-    tdim = domain.topology.dim
-    fdim = tdim - 1
-    gdim = domain.geometry.dim
+def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model=None):
 
-    domain.topology.create_connectivity(fdim, tdim)
-    domain.topology.create_connectivity(fdim, 0)
+    cfg = {
+        "t_start": 0.0,
+        "T": 3.0,
+        "num_steps": 50,
+        "bc_tol": 1e-6,
+        # Vecteurs 3D de vitesse/déplacement par unité de temps
+        "disp_value_up":   [0.0,  0.01, 0.0],
+        "disp_value_down": [0.0, -0.01, 0.0],
+        **(config or {})
+    }
 
-    boundary_facets = mesh.exterior_facet_indices(domain.topology)
-    f_to_v = domain.topology.connectivity(fdim, 0)
-    x = domain.geometry.x[:, :gdim]
-
-    h_facets = np.zeros(len(boundary_facets))
-    for i, facet in enumerate(boundary_facets):
-        verts = f_to_v.links(facet)
-        coords = x[verts]
-        if len(coords) > 1:
-            diffs = coords[:, None, :] - coords[None, :, :]
-            dists = np.linalg.norm(diffs, axis=-1)
-            h_facets[i] = dists.max()
-        else:
-            h_facets[i] = 0.0
-
-    h_facets = h_facets[h_facets > 0]
-    tol = safety_factor * np.median(h_facets)
-    return tol
-
-    
-def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model: PlasticityModel = None):
-    import pyvista as pv
-    import dolfinx.plot
-    import numpy as np
-    
-    cfg       = {**DEFAULT_CONFIG, **(config or {})}
-    t         = cfg["t_start"]
+    t = cfg["t_start"]
     num_steps = cfg["num_steps"]
-    dt        = (cfg["T"] - t) / num_steps
-    pvd_file_path = cfg["pvd_file_path"]
-    vtu_function_name = cfg.get("vtu_function_name", "displacement_projected")
+    dt = (cfg["T"] - t) / num_steps
+    bc_tol = cfg.get("bc_tol", 1e-6)
 
-    vtu_files = get_vtu_files_from_pvd(pvd_file_path)
-    
-    if len(vtu_files) < num_steps + 1:
-        raise ValueError(f"Pas assez de fichiers VTU ({len(vtu_files)}) pour le nombre de pas de temps demandé ({num_steps + 1}).")
-
-    tol = 1
-    print(f"Boundary tolerance: {tol}")
+    # Conversion des vecteurs 3D de base
+    base_up   = np.array(cfg["disp_value_up"], dtype=PETSc.ScalarType)
+    base_down = np.array(cfg["disp_value_down"], dtype=PETSc.ScalarType)
 
     if model is None:
         elastic = ElasticModel(E=cfg["E"], nu=cfg["nu"], tdim=domain.topology.dim)
-        model   = J2IsotropicHardening(
+        model = J2IsotropicHardening(
             elastic, sigma_Y=cfg["sigma_Y"], Q_var=cfg["Q_var"], k=cfg["k_hardening"]
         )
 
     state = model.create_state(domain, W, WT)
 
-    # ---------------------------------------- boundary conditions --------
-    bcs = dirichlet_bcs_from_vtu(domain, V, vtu_files[0], vtu_function_name, tol)
+    # ---------------------------------------- BCs initiales à t_start
+    bcs = dirichlet_bcs(
+        domain, V, 
+        disp_value_up=base_up * t, 
+        disp_value_down=base_down * t, 
+        tol=bc_tol
+    )
 
     uh, problem, solver = build_solver(domain, V, model, state, bcs)
-    ds                  = build_right_facet_tag(domain, coord)
+    ds = build_right_facet_tag(domain, coord)
 
     # ----------------- initialisation PyVista MultiBlock -----------------
     cells, types, x = dolfinx.plot.vtk_mesh(V)
     displ_multiblock = pv.MultiBlock()
 
-    # -------------------------------------------- time loop --------------
-    force_vec  = []
+    # -------------------------------------------- Boucle temporelle ------
+    force_vec = []
 
     opts = PETSc.Options()
     opts["ksp_monitor"]  = None
@@ -307,16 +203,25 @@ def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model: Pl
     for step in range(num_steps + 1):
         if step > 0:
             t += dt
-            bcs = dirichlet_bcs_from_vtu(domain, V, vtu_files[step], vtu_function_name, tol)
-            problem.bcs = bcs
-            
+            # Le vecteur 3D est multiplié par le temps t (ou pas de temps)
+            current_disp_up   = base_up * t
+            current_disp_down = base_down * t
+
+            # Mise à jour des conditions aux limites
+            problem.bcs = dirichlet_bcs(
+                domain, V, 
+                disp_value_up=current_disp_up, 
+                disp_value_down=current_disp_down, 
+                tol=bc_tol
+            )
+
         solver.solve(uh)
 
-        # ---- post-processing for this step ----
-        eps                  = model.elastic.epsilon(uh)
+        # ---- Post-traitement ----
+        eps = model.elastic.epsilon(uh)
         delta_p, delta_eps_p = model.update(state, eps)
 
-        # ---- création du bloc PyVista pour ce pas de temps ----
+        # ---- Création du bloc PyVista ----
         step_grid = pv.UnstructuredGrid(cells, types, x)
         
         bs = V.dofmap.index_map_bs
@@ -332,16 +237,21 @@ def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model: Pl
         displ_multiblock.append(step_grid)
         displ_multiblock.set_block_name(step, f"step_{step:02d}")
 
-        # ---- calcul de la force de réaction ----
-        stress    = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
-        force     = fem.assemble_scalar(fem.form(stress[1, 1] * ds(1)))
+        # ---- Calcul de la force de réaction ----
+        stress = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
+        force  = fem.assemble_scalar(fem.form(stress[1, 1] * ds(1)))
         force_vec.append(force)
 
         model.commit(state, uh)
-        
+
     print("p_max =", np.max(state.p_old.x.array), " | p_mean =", np.mean(state.p_old.x.array))
 
     return force_vec, displ_multiblock
+
+
+
+
+
 
 def animer_deformee(multiblock, factor=10.0, component=None, fps=20):
     all_scalars = []
@@ -394,35 +304,62 @@ def animer_deformee(multiblock, factor=10.0, component=None, fps=20):
     print("Fenêtre finale active pour manipulation statique.")
     plotter.show()
 
+
 if __name__ == "__main__":
+    from time import time
+
+    # ---------------------------------------------------------
+    # Configuration générale de la simulation
+    # ---------------------------------------------------------
     config = dict(
-        t_start     = 0.0,
-        T           = 3.0,
-        num_steps   = 50,
-        load_amp    = 0.01,
-        length      = 10.0,
-        mesh_file   = "Flat_specimen_refined.msh",
-        output_dir  = "results_plasticity",
-        file_name    = "import_bcs",
-        E           = 200_000.0,
-        nu          = 0.3,
-        sigma_Y     = 100.0,
-        Q_var       = 50.0,
-        k_hardening = 1000.0,
+        t_start           = 0.0,
+        T                 = 3.0,
+        num_steps         = 50,
+        length            = 10.0,
+        output_dir        = "results_plasticity",
+        file_name         = "import_bcs",
+        # Propriétés matériau
+        E                 = 200_000.0,
+        nu                = 0.3,
+        sigma_Y           = 100.0,
+        Q_var             = 50.0,
+        k_hardening       = 1000.0,
+        # Vecteurs 3D [ux, uy, uz] servant de base (multipliés par t)
+        disp_value_up     = [0.0,  0.01, 0.0],  # Vitesse bord supérieur [mm/s]
+        disp_value_down   = [0.0, -0.01, 0.0],  # Vitesse bord inférieur [mm/s]
+        bc_tol            = 1e-6,
+        # Fichiers d'entrée
         pvd_file_path     = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd",
         vtu_function_name = "displacement_projected"
     )
-    from time import time
+    
     start_time = time()
-    
+
+    # Charger le maillage depuis le premier fichier VTU
     vtu_file = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected_0000.vtu"
-    
+
     domain = load_domain_from_vtu(vtu_file)
-    print(f"Domaine chargé avec succès !")
+    print("Domaine chargé avec succès !")
     print(f"Nombre de cellules : {domain.topology.index_map(domain.topology.dim).size_global}")
+
+    # Construction des espaces fonctionnels
     V, W, WT = build_function_spaces(domain)
 
-    forces, multiblock = run_simulation_bc_vtu_fast(domain, V, W, WT, config=config)
+    # Instanciation du modèle élastoplastique J2
+    model = J2IsotropicHardening(
+        elastic=ElasticModel(config["E"], config["nu"], tdim=domain.topology.dim),
+        sigma_Y=config["sigma_Y"],
+        Q_var=config["Q_var"],
+        k=config["k_hardening"],
+    )
+
+    # Lancement de la simulation (récupération de la force et des blocs PyVista)
+    force_vec, multiblock = run_simulation_bc_vtu_fast(
+        domain, V, W, WT, 
+        config=config, 
+        model=model
+    )
+
     end_time = time()
-    print(f"Simulation completed in {end_time - start_time:.2f} seconds.")
-    print("pas de soucis la team")
+    print(f"Simulation terminée en {end_time - start_time:.2f} secondes.")
+    print(f"Nombre de pas générés dans le MultiBlock : {len(multiblock)}")
