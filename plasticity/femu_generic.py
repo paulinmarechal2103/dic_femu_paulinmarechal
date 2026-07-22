@@ -389,7 +389,7 @@ def femu_res_generic(
         params0_norm,
         method='trf',
         bounds=bounds_norm,
-        ftol=1e-6, gtol=1e-6, max_nfev=150, verbose=2, x_scale=1.0, diff_step=1e-3,
+        ftol=1e-6, gtol=1e-6, max_nfev=150, verbose=2, x_scale=1.0, diff_step=5e-3,
     )
 
     plt.ioff()
@@ -415,14 +415,30 @@ if __name__ == "__main__":
     real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]
     params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
 
+    # 3. Génération de la perturbation (inchangée)
+    seed(43)  # Pour la reproductibilité
+    perturbation_percentage = 0.15  # 15% de perturbation aléatoire
+    bounds_ref_J2_centr= [
+            (200000, 200000+1e-6),   # E [MPa]
+            (0.3, 0.3+1e-10),         # nu 
+            (10.0, 500.0),        # sigma_Y [MPa]
+            (5.0, 400.0),         # Q_var [MPa]
+            (10.0, 1500.0),          # k_hardening
+        ]
+    normalized_result = normalize_params(real_params, bounds_ref_J2_centr)
+    normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
+    normalized_disturbed = [min(max(i, 0.0), 1.0) for i in normalized_disturbed]  # Clamp entre 0 et 1
+    parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2_centr)
+
     print("Lancement de l'optimisation FEMU via le pipeline PyVista...")
 
     # 4. Lancement de l'optimisation avec le fichier PVD
     optimizer_result = femu_res_generic(
             PVD_FILE,
             model_name="J2IsotropicHardening",
-            free_param_names=["sigma_Y"],
-            fixed_param_overrides={"E": 200_000.0, "nu": 0.3,"Q_var": 50.0, "k_hardening": 1_000.0},
+            params0_overrides={"sigma_Y": parameters_disturbed[2], "Q_var": parameters_disturbed[3], "k_hardening": parameters_disturbed[4]},
+            free_param_names=["sigma_Y","Q_var", "k_hardening"],
+            fixed_param_overrides={"E": 200_000.0, "nu": 0.3},
         )
 
     
