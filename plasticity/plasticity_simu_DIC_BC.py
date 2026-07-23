@@ -177,7 +177,7 @@ def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model=Non
 
     state = model.create_state(domain, W, WT)
 
-    # ---------------------------------------- BCs initiales à t_start
+    # ---------------------------------------- BCs initiales (servent à instancier le solver)
     bcs = dirichlet_bcs(
         domain, V, 
         disp_value_up=base_up * t, 
@@ -201,19 +201,17 @@ def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model=Non
     log.set_log_level(log.LogLevel.ERROR)
 
     for step in range(num_steps + 1):
-        if step > 0:
-            t += dt
-            # Le vecteur 3D est multiplié par le temps t (ou pas de temps)
-            current_disp_up   = base_up * t
-            current_disp_down = base_down * t
+        t += dt
+        current_disp_up   = base_up * t
+        current_disp_down = base_down * t
 
-            # Mise à jour des conditions aux limites
-            problem.bcs = dirichlet_bcs(
-                domain, V, 
-                disp_value_up=current_disp_up, 
-                disp_value_down=current_disp_down, 
-                tol=bc_tol
-            )
+        # 2. Application directe des CLs mises à jour dès le step 0
+        problem.bcs = dirichlet_bcs(
+            domain, V, 
+            disp_value_up=current_disp_up, 
+            disp_value_down=current_disp_down, 
+            tol=bc_tol
+        )
 
         solver.solve(uh)
 
@@ -247,8 +245,6 @@ def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model=Non
     print("p_max =", np.max(state.p_old.x.array), " | p_mean =", np.mean(state.p_old.x.array))
 
     return force_vec, displ_multiblock
-
-
 
 
 

@@ -1359,6 +1359,9 @@ if __name__ == "__main__":
 
     # ---- run simulation with relaxation phase ----------------------------
     forces, _ = run_simulation_write(domain, V, W, WT, config=config)
+    np.save("forces_sample.npy", forces)
+    # with open("forces_sample.npy", "wb") as f:
+    #     np.save(f, forces)
     print("pas de soucis la team")
 
     # ---- plot reaction force vs. time step -------------------------------

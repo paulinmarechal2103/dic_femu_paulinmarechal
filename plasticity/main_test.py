@@ -16,62 +16,28 @@ H5_FILE = "MAINTEST/dic_series.h5"
 GMSH_FILE = "x65.msh"
 OUTPUT_XDMF = "MAINTEST/projection_cad_temporelle_mask.xdmf"
 
-import_csv = 1 # 1 pour importer les CSV, 0 pour ne pas le faire
 project_csv = 1  # 1 pour projeter, 0 pour ne pas le faire
 femu = 0  # 1 pour lancer l'optimisation, 0 pour ne pas le faire
 
 
 
 
+import os
 
 
-if import_csv == 1:
-
-    process_csv_series_pyvista(
-        folder_path=dossier_csv, 
-        output_pvd="MAINTEST/pyvista_exports/csv_imports/dic_series.pvd", 
-        file_prefix=file_prefix, 
+if project_csv == 1:
+    process_csv_series_to_cad_mesh(
+        folder_path="/home/pmarechal/Documents/synthetic_csv/fenicsx_surface_z0_csv",
+        file_prefix="FE_z0_step_", 
+        mesh_cad_path="Flat_specimen_refined.msh", 
+        tform_h5_to_cad_4D = np.identity(4), 
+        output_pvd_path = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd",
         alpha=20.0,
         ech=1,
         start_idx = 0,
         end_idx = 52,
     )
-
-
-
-import os
-
-
-
-
-if project_csv == 1:
- 
-    print("=" * 60)
-    print("  VÉRIFICATION ET LANCEMENT DE LA PROJECTION TEMPORELLE")
-    print("=" * 60)
-
-    try:
-        # Exécution de la fonction globale de traitement
-        project_vtu_series_to_cad_mesh_mask(
-            input_pvd_path = "MAINTEST/pyvista_exports/csv_imports/dic_series.pvd", 
-            mesh_cad_path="Flat_specimen_refined.msh", 
-            tform_h5_to_cad_4D = np.identity(4), 
-            output_pvd_path = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd"
-        )
-        print("\n" + "=" * 60)
-        print("[Succès] Traitement terminé sans accroc.")
-        print(f"[Aide] Vous pouvez maintenant ouvrir dans ParaView")
-        print("       pour visualiser le déplacement projeté sur la CAO au cours du temps.")
-        print("=" * 60)
-        
-    except Exception as e:
-        print("\n" + "!" * 60)
-        print("[Échec] Une erreur est survenue pendant l'interpolation :")
-        print("!" * 60)
-        import traceback
-        traceback.print_exc()
-
-
+    
 if femu == 1:
     from random import uniform, seed
     import numpy as np

@@ -1,26 +1,16 @@
-"""
-FEMU générique : identification conjointes de paramètres matériau et de CLs paramétriques
-sur des champs de déplacement DIC (fichiers PVD/VTU).
-"""
-
 import numpy as np
-from datetime import datetime
-from scipy.spatial import KDTree
-from scipy.optimize import least_squares, Bounds
+import pyvista as pv
 import matplotlib.pyplot as plt
+from datetime import datetime
+from scipy.optimize import least_squares, Bounds
+from scipy.spatial import KDTree
 import dolfinx
 from dolfinx import fem, mesh
 from petsc4py import PETSc
-import pyvista as pv
 
 from femu import *
 from femu_DIC import *
 from plasticity_simu_DIC_BC import *
-import numpy as np
-import pyvista as pv
-import matplotlib.pyplot as plt
-from datetime import datetime
-from scipy.optimize import least_squares, Bounds
 
 # ---------------------------------------------------------------------------
 # 1. Registre des modèles disponibles (Comportement + CLs Vectorielles)
@@ -66,12 +56,94 @@ MODEL_REGISTRY = {
     },
 }
 
+# ---------------------------------------------------------------------------
+# 2. Calcul des résidus mixtes (Déplacement DIC + Force)
+# ---------------------------------------------------------------------------
+
+def compute_u_f_residuals_is_imported(
+        ref_multiblock, 
+        sim_multiblock, 
+        f_ref, 
+        f_sim, 
+        vtu_function_name="displacement_projected",
+        sim_function_name=None,  # Si le nom dans la simu diffère de la ref
+        weight_u=1.0,
+        weight_f=1.0,
+        normalize=True):
+    
+    res_u_list = []
+    f_ref = np.asarray(f_ref, dtype=np.float64)
+    f_sim = np.asarray(f_sim, dtype=np.float64)
+    
+    num_steps = min(len(ref_multiblock), len(sim_multiblock), len(f_ref), len(f_sim))
+    
+    # Nom du champ dans la simulation (par défaut le même que la référence)
+    if sim_function_name is None:
+        sim_function_name = vtu_function_name
+
+    # Diagnostic au premier pas si la clé manque
+    ref_grid_0 = ref_multiblock[0]
+    sim_grid_0 = sim_multiblock[0]
+
+    if vtu_function_name not in ref_grid_0.point_data:
+        raise KeyError(
+            f"Champ '{vtu_function_name}' introuvable dans REF point_data. "
+            f"Clés disponibles dans REF : {list(ref_grid_0.point_data.keys())}"
+        )
+    if sim_function_name not in sim_grid_0.point_data:
+        raise KeyError(
+            f"Champ '{sim_function_name}' introuvable dans SIM point_data. "
+            f"Clés disponibles dans SIM : {list(sim_grid_0.point_data.keys())}"
+        )
+
+    for t in range(num_steps):
+        ref_grid = ref_multiblock[t]
+        sim_grid = sim_multiblock[t]
+        
+        # Filtre sur la zone mesurée par DIC
+        if "is_imported" in ref_grid.point_data:
+            is_imported = ref_grid.point_data["is_imported"]
+            mask_imported = np.isclose(is_imported, 0.1, atol=1e-6)
+        else:
+            mask_imported = np.ones(ref_grid.n_points, dtype=bool)
+            
+        if ref_grid.points.shape[1] >= 3:
+            mask_z = np.isclose(ref_grid.points[:, 2], 0.0, atol=1e-6)
+            mask = mask_imported & mask_z
+        else:
+            mask = mask_imported
+
+        u_ref_t = ref_grid.point_data[vtu_function_name][mask]
+        u_sim_t = sim_grid.point_data[sim_function_name][mask]
+        
+        diff_u = (u_sim_t - u_ref_t).ravel()
+        res_u_list.append(diff_u)
+        
+    res_u = np.concatenate(res_u_list)
+    res_f = (f_sim[:num_steps] - f_ref[:num_steps]).ravel()
+
+    if normalize:
+        scale_u = np.std(res_u) if np.std(res_u) > 1e-12 else 1.0
+        scale_f = np.std(f_ref[:num_steps]) if np.std(f_ref[:num_steps]) > 1e-12 else 1.0
+        
+        norm_factor_u = (1.0 / (scale_u * np.sqrt(len(res_u)))) * weight_u
+        norm_factor_f = (1.0 / (scale_f * np.sqrt(len(res_f)))) * weight_f
+        
+        res_u = res_u * norm_factor_u
+        res_f = res_f * norm_factor_f
+    else:
+        res_u = res_u * weight_u
+        res_f = res_f * weight_f
+
+    return np.concatenate([res_u, res_f])
+
+
 
 # ---------------------------------------------------------------------------
-# 4. Fonction objectif de l'optimiseur
+# 3. Fonction objectif de l'optimiseur
 # ---------------------------------------------------------------------------
 def compute_residuals_generic_DIC_BC(
-        domain, V, W, WT, ref_multiblock,
+        domain, V, W, WT, f_ref, ref_multiblock,
         model_name, free_param_names, free_param_values, fixed_params,
         config=None):
 
@@ -109,26 +181,38 @@ def compute_residuals_generic_DIC_BC(
         n_masked = mask_imported.sum()
 
     active_comps_len = 2 if V.dofmap.bs >= 2 else 1
-    expected_size = n_masked * active_comps_len * len(ref_multiblock)
+    expected_u_size = n_masked * active_comps_len * len(ref_multiblock)
+    expected_f_size = len(ref_multiblock)
+    expected_total_size = expected_u_size + expected_f_size
 
     try:
-        # CORRECTION ICI : Récupération uniquement du MultiBlock (2e élément du tuple)
-        _, sim_multiblock = run_simulation_bc_vtu_fast(domain, V, W, WT, run_cfg, model=model)
+        f_sim, sim_multiblock = run_simulation_bc_vtu_fast(domain, V, W, WT, run_cfg, model=model)
         
         vtu_function_name = run_cfg.get("vtu_function_name", "displacement_projected")
-        error = compute_u_residuals_is_imported(
-            ref_multiblock, sim_multiblock, vtu_function_name=vtu_function_name
+        weight_u = run_cfg.get("weight_u", 1.0)
+        weight_f = run_cfg.get("weight_f", 1.0)
+        
+        error = compute_u_f_residuals_is_imported(
+            ref_multiblock, sim_multiblock, f_ref, f_sim,
+            vtu_function_name="displacement_projected",
+            sim_function_name="displacement",
+            weight_u=weight_u,
+            weight_f=weight_f
         )
     except Exception as e:
         print(f"--> [Simulation/Newton Divergence] Exception : {e}. Pénalisation de l'erreur.")
-        error = np.ones(expected_size) * 1e3
+        error = np.ones(expected_total_size) * 1e3
+        f_sim = np.zeros_like(f_ref) # Sécurité en cas de divergence
 
-    return error
+    return error, f_sim
+
+
 # ---------------------------------------------------------------------------
-# 5. Boucle FEMU principale
+# 4. Boucle FEMU principale
 # ---------------------------------------------------------------------------
 def femu_res_generic(
         PVD_FILE,
+        FORCE_FILE,
         model_name,
         free_param_names=None,
         fixed_param_overrides=None,
@@ -160,6 +244,7 @@ def femu_res_generic(
     params0 = [params0_dict[k] for k in free_param_names]
     bounds_free = [bounds_all[k] for k in free_param_names]
 
+    # Chargement des champs de déplacement DIC
     vtu_files = get_vtu_files_from_pvd(PVD_FILE)
     domain = load_domain_from_vtu(vtu_files[0])
     V, W, WT = build_function_spaces(domain)
@@ -170,26 +255,42 @@ def femu_res_generic(
         ref_multiblock.append(pv.read(f_vtu))
     print(f"Chargé {len(ref_multiblock)} pas de temps de référence.")
 
+    # Chargement des données de force expérimentales
+    print(f"Chargement du fichier de forces : {FORCE_FILE}")
+    f_ref = np.load(FORCE_FILE)
+    print(f"Chargé {len(f_ref)} points de force.")
+
     cfg = {
         "pvd_file_path": PVD_FILE,
         "num_steps": len(vtu_files) - 1,
         "t_start": 0.0,
         "T": 3.0,
+        "weight_u": 1.0,  # Pondération relative U
+        "weight_f": 1.0,  # Pondération relative Force
         **(config or {})
     }
 
     n_free = len(free_param_names)
+    # On ajoute 2 emplacements réservés : 1 pour les résidus + 1 pour la courbe de force
+    n_total_plots = n_free + 2
     n_cols = 4
-    n_rows = int(np.ceil((n_free + 1) / n_cols))
+    n_rows = int(np.ceil(n_total_plots / n_cols))
 
     plt.ion()
     fig = plt.figure(figsize=(4 * n_cols, 3.5 * n_rows))
     gs = fig.add_gridspec(n_rows, n_cols)
 
+    # Graphique 1 (gs[0, 0]) : Convergence des résidus
     ax_err = fig.add_subplot(gs[0, 0])
+    
+    # Graphique 2 (gs[0, 1]) : Fitting Force / Pas de temps
+    ax_force = fig.add_subplot(gs[0, 1])
+
+    # Graphiques 3 à N : Évolution des paramètres
     ax_params = []
-    for i in range(1, n_free + 1):
-        row, col = divmod(i, n_cols)
+    for i in range(n_free):
+        slot_idx = i + 2  # Décalage de 2 slots
+        row, col = divmod(slot_idx, n_cols)
         ax_params.append(fig.add_subplot(gs[row, col]))
 
     history_err = []
@@ -206,8 +307,9 @@ def femu_res_generic(
         if fixed_params:
             print("Paramètres fixes :", fixed_params)
 
-        residuals = compute_residuals_generic_DIC_BC(
-            domain, V, W, WT, ref_multiblock,
+        # Récupération des résidus ET de la force simulée
+        residuals, f_sim = compute_residuals_generic_DIC_BC(
+            domain, V, W, WT, f_ref, ref_multiblock,
             model_name=model_name,
             free_param_names=free_param_names,
             free_param_values=params_phys,
@@ -221,12 +323,26 @@ def femu_res_generic(
         data_p = np.array(history_params)
 
         try:
+            # --- 1. Graphique Erreur globale ---
             ax_err.clear()
             ax_err.plot(history_err, color='firebrick', lw=1.5)
             ax_err.set_yscale('log')
             ax_err.set_title(r"Norme Résidus (Log $\sum r^2$)")
             ax_err.grid(True, which="both", ls="-", alpha=0.2)
 
+            # --- 2. Graphique Fitting Force / Pas de temps ---
+            ax_force.clear()
+            steps_ref = np.arange(len(f_ref))
+            steps_sim = np.arange(len(f_sim))
+            ax_force.plot(steps_ref, f_ref, 'k--', label="F exp", lw=1.5)
+            ax_force.plot(steps_sim, f_sim, 'r-', label="F sim", lw=1.5)
+            ax_force.set_title("Fitting Force")
+            ax_force.set_xlabel("Pas de temps")
+            ax_force.set_ylabel("Force [N]")
+            ax_force.legend(fontsize=8)
+            ax_force.grid(True, alpha=0.2)
+
+            # --- 3. Graphiques Paramètres ---
             for i, name in enumerate(free_param_names):
                 ax_params[i].clear()
                 ax_params[i].plot(data_p[:, i], color='royalblue')
@@ -235,10 +351,12 @@ def femu_res_generic(
 
             plt.tight_layout()
             plt.pause(0.001)
-        except Exception:
-            pass
+        except Exception as e_plot:
+            print(f"Erreur d'affichage : {e_plot}")
 
         print(f"Norme des résidus : {error_scalar:.6e}")
+        
+        # scipy.optimize.least_squares attend uniquement le tableau 1D de résidus
         return residuals
 
     result_norm = least_squares(
@@ -246,7 +364,7 @@ def femu_res_generic(
         params0_norm,
         method='trf',
         bounds=bounds_norm,
-        ftol=1e-6, gtol=1e-8, max_nfev=150, verbose=2, x_scale=1.0, diff_step=5e-3,
+        ftol=1e-6, gtol=1e-8, max_nfev=150, verbose=2, x_scale=1.0, diff_step=1e-2,
     )
 
     plt.ioff()
@@ -260,19 +378,33 @@ def femu_res_generic(
     return result_phys
 
 
+# ---------------------------------------------------------------------------
+# 5. Point d'entrée
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     PVD_FILE = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd"
+    FORCE_FILE = "forces_sample.npy"
 
-    print("Lancement de l'optimisation FEMU (Paramètres matériau + Vecteurs CLs haut/bas)...")
+    print("Lancement de l'optimisation FEMU mixte (Champs u + Forces F)...")
 
-    # Exemple d'appel : identification conjointe de (sigma_Y, Q_var, k_hardening, uy_up, uy_down)
     optimizer_result = femu_res_generic(
         PVD_FILE,
+        FORCE_FILE,
         model_name="J2IsotropicHardening",
+        params0_overrides={
+            "sigma_Y": 90.0,
+            "Q_var": 45.0,
+            "k_hardening": 1_100.0,
+            
+        },
         free_param_names=[
             "sigma_Y",
             "Q_var",
-            "k_hardening","uy_up", "uy_down","ux_down","ux_up"
+            "k_hardening",
+            "uy_up",
+            "uy_down",
+            "ux_down",
+            "ux_up"
         ],
         fixed_param_overrides={
             "E": 200_000.0,
@@ -280,6 +412,10 @@ if __name__ == "__main__":
             "uz_up": 0.0,
             "uz_down": 0.0,
         },
+        config={
+            "weight_u": 1.0,  # Ajustable si vous souhaitez donner plus de poids à la force ou au déplacement
+            "weight_f": 5.0,
+        }
     )
 
     print("\n================ OPTIMISATION TERMINÉE ================")
