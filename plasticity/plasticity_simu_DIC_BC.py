@@ -162,7 +162,7 @@ def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model=Non
 
     t = cfg["t_start"]
     num_steps = cfg["num_steps"]
-    dt = (cfg["T"] - t) / num_steps
+    dt = (cfg["T"]) / num_steps
     bc_tol = cfg.get("bc_tol", 1e-6)
 
     # Conversion des vecteurs 3D de base
@@ -201,7 +201,6 @@ def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model=Non
     log.set_log_level(log.LogLevel.ERROR)
 
     for step in range(num_steps + 1):
-        t += dt
         current_disp_up   = base_up * t
         current_disp_down = base_down * t
 
@@ -241,7 +240,7 @@ def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model=Non
         force_vec.append(force)
 
         model.commit(state, uh)
-
+        t += dt
     print("p_max =", np.max(state.p_old.x.array), " | p_mean =", np.mean(state.p_old.x.array))
 
     return force_vec, displ_multiblock

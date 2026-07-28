@@ -164,7 +164,6 @@ def interpolate_displacement_obs_mesh_to_cad_mesh_2D(
 
     mesh_cad_target.point_data["displacement_projected"] = disp_cad_transformed
 
-
 def process_csv_series_to_cad_mesh(
     folder_path: str,
     file_prefix: str,
@@ -177,23 +176,14 @@ def process_csv_series_to_cad_mesh(
     end_idx: Optional[int] = None,
     distance_threshold: float = 1.0,
 ) -> None:
-    """Fusion de process_csv_series_pyvista + project_vtu_series_to_cad_mesh_mask.
+    """Projection d'une série temporelle de CSV sur un maillage CAD global.
 
-    Lit directement la série de CSV de déplacements, construit le maillage de référence,
-    calcule le sous-maillage CAD actif + son masque, puis interpole et sauvegarde
-    chaque pas de temps DIRECTEMENT projeté sur le CAD, sans passer par une série
-    VTU/PVD "observée" intermédiaire sur disque.
+    Lit la série de CSV de déplacements, construit le maillage de référence,
+    charge le maillage CAD complet, calcule le masque de présence des données
+    expérimentales, puis interpole et sauvegarde chaque pas de temps sur le CAD global.
 
-    Corrections principales par rapport aux deux fonctions d'origine :
-      - Le masque 'is_imported' est désormais réellement appliqué : le déplacement
-        projeté est mis à 0 en dehors de la zone couverte par les données observées
-        (bug d'origine : le masque était calculé mais jamais utilisé pour filtrer
-        'displacement_projected').
-      - distance_threshold n'est plus une constante codée en dur.
-      - Vérification explicite qu'au moins un pas de temps a pu être traité avant
-        d'écrire le PVD final (sinon un PVD vide était généré silencieusement).
-      - `os.makedirs(..., exist_ok=True)` au lieu du test manuel d'existence.
-      - Formatage cohérent du timestep dans le PVD.
+    Les nœuds du CAD situés en dehors de la zone observée (au-delà de `distance_threshold`)
+    voient leur déplacement 'displacement_projected' imposé à 0.0.
     """
     # ---- 1. Détection dynamique des fichiers CSV disponibles ----
     search_pattern = os.path.join(folder_path, f"{file_prefix}[0-9][0-9][0-9][0-9].csv")
@@ -229,42 +219,33 @@ def process_csv_series_to_cad_mesh(
     mesh_obs = create_reference_mesh_from_csv(first_csv, alpha=alpha)
     points_obs = mesh_obs.points
 
-    # ---- 3. Chargement du maillage CAD + sous-maillage actif + masque ----
+    # ---- 3. Chargement du maillage CAD global + calcul du masque ----
     print(f"[2/3] Chargement du maillage CAD : {mesh_cad_path}")
     if mesh_cad_path.lower().endswith(".msh"):
         mesh_cad = read_msh_safely(mesh_cad_path)
     else:
         mesh_cad = pv.read(mesh_cad_path)
 
+    # Passage des points observés dans le repère CAD
     points_hom = np.hstack([points_obs, np.ones((points_obs.shape[0], 1))])
     points_obs_in_cad = (tform_h5_to_cad_4D @ points_hom.T).T[:, :3]
     points_obs_2d = points_obs_in_cad[:, :2]
     tree_obs_2d = KDTree(points_obs_2d)
 
-    cell_centers = mesh_cad.cell_centers().points
-    distances, _ = tree_obs_2d.query(cell_centers[:, :2], distance_upper_bound=distance_threshold)
-    cell_mask_initial = distances <= distance_threshold
+    # Calcul de proximité sur TOUS les points du maillage CAD complet
+    cad_distances, _ = tree_obs_2d.query(
+        mesh_cad.points[:, :2], distance_upper_bound=distance_threshold
+    )
+    is_imported = cad_distances <= distance_threshold
 
-    if not np.any(cell_mask_initial):
+    if not np.any(is_imported):
         raise ValueError(
-            "Aucune cellule du maillage CAD ne correspond aux données observées "
+            "Aucun point du maillage CAD ne correspond aux données observées "
             f"(seuil de distance = {distance_threshold})."
         )
 
-    active_y = cell_centers[cell_mask_initial, 1]
-    y_min, y_max = active_y.min(), active_y.max()
-    print(f" -> Extension du sous-maillage CAD sur la plage Y : [{y_min:.2f}, {y_max:.2f}]")
-
-    tol = 1e-5
-    cell_mask_extended = (cell_centers[:, 1] >= y_min - tol) & (cell_centers[:, 1] <= y_max + tol)
-    submesh_volume = mesh_cad.extract_cells(np.where(cell_mask_extended)[0])
-
-    submesh_distances, _ = tree_obs_2d.query(
-        submesh_volume.points[:, :2], distance_upper_bound=distance_threshold
-    )
-    is_imported = submesh_distances <= distance_threshold
-    submesh_volume.point_data["is_imported"] = np.where(is_imported, 0.1, 0.0)
-    outside_mask = ~is_imported  # calculé une seule fois, réutilisé à chaque pas de temps
+    mesh_cad.point_data["is_imported"] = np.where(is_imported, 0.1, 0.0)
+    outside_mask = ~is_imported  # Prépare le masque binaire d'exclusion
 
     # ---- 4. Transformation inverse ----
     tform_cad_to_img_4D = np.linalg.inv(tform_h5_to_cad_4D)
@@ -275,7 +256,7 @@ def process_csv_series_to_cad_mesh(
     os.makedirs(output_dir, exist_ok=True)
 
     print(
-        f"[3/3] Projection des {len(steps_to_process)} pas de temps sur le maillage CAD "
+        f"[3/3] Projection des {len(steps_to_process)} pas de temps sur le CAD global "
         f"-> {output_pvd_path}"
     )
     processed_steps: List[Tuple[float, str]] = []
@@ -290,18 +271,17 @@ def process_csv_series_to_cad_mesh(
 
         interpolate_displacement_obs_mesh_to_cad_mesh_2D(
             mesh_obs=mesh_obs,
-            mesh_cad_target=submesh_volume,
+            mesh_cad_target=mesh_cad,
             tform_cad_to_img_4D=tform_cad_to_img_4D,
         )
 
-        # Application effective du masque : hors zone "is_imported", déplacement nul
-        # (c'était calculé mais jamais utilisé dans le code d'origine).
-        submesh_volume.point_data["displacement_projected"][outside_mask] = 0.0
+        # Application du masque : les points du CAD hors zone couverte reçoivent 0
+        mesh_cad.point_data["displacement_projected"][outside_mask] = 0.0
 
         vtu_filename = f"{pvd_name_no_ext}_{step:04d}.vtu"
-        submesh_volume.save(os.path.join(output_dir, vtu_filename))
+        mesh_cad.save(os.path.join(output_dir, vtu_filename))
         processed_steps.append((float(step), vtu_filename))
-        print(f" -> t={step:04d} projeté ({csv_path}).")
+        print(f" -> t={step:04d} projeté sur CAD complet ({csv_path}).")
 
     if not processed_steps:
         raise RuntimeError("Aucun pas de temps n'a pu être traité (tous les CSV étaient manquants).")
@@ -316,8 +296,7 @@ def process_csv_series_to_cad_mesh(
         f.write("  </Collection>\n")
         f.write("</VTKFile>\n")
 
-    print(f"[Succès] Série temporelle projetée générée : {output_pvd_path}")
-
+    print(f"[Succès] Série temporelle globale projetée générée : {output_pvd_path}")
 
 if __name__ == "__main__":
 
@@ -334,8 +313,8 @@ if __name__ == "__main__":
     try:
         # Exécution de la fonction globale de traitement
         process_csv_series_to_cad_mesh(
-            folder_path="/home/pmarechal/Documents/synthetic_csv/fenicsx_surface_z0_csv",
-            file_prefix="FE_z0_step_", 
+            folder_path="/home/pmarechal/Documents/synthetic_csv/fenicsx_surface_z0_y7_csv",
+            file_prefix="FE_z0_y7_step_", 
             mesh_cad_path="Flat_specimen_refined.msh", 
             tform_h5_to_cad_4D = np.identity(4), 
             output_pvd_path = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd",

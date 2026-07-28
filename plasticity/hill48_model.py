@@ -232,11 +232,11 @@ if __name__ == "__main__":
         t_start     = 0.0,
         T           = 3.0,
         num_steps   = 50,
-        load_amp    = 0.01,       # amplitude of the applied displacement
+        load_amp    = 0.05,       # amplitude of the applied displacement
         length      = 10.0,       # half-length of the specimen
-        mesh_file   = "carre_trou.msh",
+        mesh_file   = "/home/pmarechal/Documents/geometries/butterfly.msh",
         output_dir  = "results_plasticity",
-        file_name    = "carre_trou_anisotrope_analitique",
+        file_name    = "butterfly",
         # Elastic constants (used when no model is supplied)
         E           = 200_000.0,
         nu          = 0.3,
@@ -244,11 +244,11 @@ if __name__ == "__main__":
         sigma_Y     = 100.0,
         Q_var       = 50.0,
         k_hardening = 1000.0,
-        F = 0.900,  # Anisotropie dans le plan transverse
+        F = 0.700,  # Anisotropie dans le plan transverse
         G = 0.600,  # Anisotropie dans le plan longitudinal
         H = 0.400,  # Terme d'interaction (souvent proche
-        L = 1.7,  # Cisaillement hors-plan (souvent supposé isotrope = 1.5)
-        M = 1.3,  # Cisaillement hors-plan (souvent supposé isotrope = 1.5)
+        L = 1.5,  # Cisaillement hors-plan
+        M = 1.5,  # Cisaillement hors-plan
         N = 1.350
     )
     modèle_hill48 = Hill48Model(
@@ -268,7 +268,8 @@ if __name__ == "__main__":
     V, W, WT = build_function_spaces(domain)
     from time import time
     start_time = time()
-    forces, _ = run_simulation_fast(domain,V,W,WT,config=config, model=modèle_hill48)
+    forces, _ = run_simulation_write(domain,V,W,WT,config=config, model=modèle_hill48)
+    np.save("forces_anisotrope_carre_trou.npy", forces)
     end_time = time()
     print(f"Simulation completed in {end_time - start_time:.2f} seconds.")
     print("pas de soucis la team")

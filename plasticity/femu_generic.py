@@ -13,8 +13,9 @@ from femu_DIC import *
 from plasticity_simu_DIC_BC import *
 
 # ---------------------------------------------------------------------------
-# 1. Registre des modèles disponibles (Comportement + CLs Vectorielles)
+# 1. Registre des modèles disponibles (Comportement + CLs Vectorielles + Temps)
 # ---------------------------------------------------------------------------
+
 MODEL_REGISTRY = {
     "J2IsotropicHardening": {
         "builder": lambda run_cfg, domain: J2IsotropicHardening(
@@ -24,28 +25,132 @@ MODEL_REGISTRY = {
             k=run_cfg["k_hardening"],
         ),
         "params_default": {
-            # Paramètres matériau
+            "t_start": 0.0,
             "E": 200_000.0,
             "nu": 0.3,
             "sigma_Y": 100.0,
             "Q_var": 50.0,
             "k_hardening": 1_000.0,
-            # Composantes du vecteur vitesse/déplacement par s [mm/s] (Bord Supérieur)
             "ux_up": 0.0,
             "uy_up": 0.01,
             "uz_up": 0.0,
-            # Composantes du vecteur vitesse/déplacement par s [mm/s] (Bord Inférieur)
             "ux_down": 0.0,
             "uy_down": -0.01,
             "uz_down": 0.0,
         },
         "bounds": {
+            "t_start": (-0.2, 0.5),
             "E": (150_000.0, 250_000.0),
             "nu": (0.2, 0.45),
             "sigma_Y": (20.0, 300.0),
             "Q_var": (0.0, 300.0),
             "k_hardening": (10.0, 5_000.0),
-            # Bornes pour les composantes vectorielles de CL
+            "ux_up": (-0.01, 0.01),
+            "uy_up": (0.0001, 0.05),
+            "uz_up": (-0.01, 0.01),
+            "ux_down": (-0.01, 0.01),
+            "uy_down": (-0.05, -0.0001),
+            "uz_down": (-0.01, 0.01),
+        },
+    },
+    "Hill48": {
+        "builder": lambda run_cfg, domain: Hill48Model(
+            elastic=ElasticModel(run_cfg["E"], run_cfg["nu"], tdim=domain.topology.dim),
+            sigma_Y=run_cfg["sigma_Y"],
+            H=run_cfg["H"],
+            F=run_cfg["F"],
+            G=run_cfg["G"],
+            L=run_cfg["L"],
+            M=run_cfg["M"],
+            N=run_cfg["N"],
+            Q_var=run_cfg["Q_var"],
+            k_hardening=run_cfg["k_hardening"],
+        ),
+        "params_default": {
+            "t_start": 0.0,
+            "E": 200_000.0,
+            "nu": 0.3,
+            "sigma_Y": 100.0,
+            "Q_var": 50.0,
+            "k_hardening": 1_000.0,
+            "F": 0.900,
+            "G": 0.600,
+            "H": 0.400,
+            "L": 1.700,
+            "M": 1.300,
+            "N": 1.350,
+            "ux_up": 0.0,
+            "uy_up": 0.01,
+            "uz_up": 0.0,
+            "ux_down": 0.0,
+            "uy_down": -0.01,
+            "uz_down": 0.0,
+        },
+        "bounds": {
+            "t_start": (-0.2, 0.5),
+            "E": (150_000.0, 250_000.0),
+            "nu": (0.2, 0.45),
+            "sigma_Y": (20.0, 300.0),
+            "Q_var": (0.0, 300.0),
+            "k_hardening": (10.0, 5_000.0),
+            "F": (0.0, 2.0),
+            "G": (0.0, 2.0),
+            "H": (0.0, 2.0),
+            "L": (0.1, 5.0),
+            "M": (0.1, 5.0),
+            "N": (0.1, 5.0),
+            "ux_up": (-0.01, 0.01),
+            "uy_up": (0.0001, 0.05),
+            "uz_up": (-0.01, 0.01),
+            "ux_down": (-0.01, 0.01),
+            "uy_down": (-0.05, -0.0001),
+            "uz_down": (-0.01, 0.01),
+        },
+    },
+    "Hill48_2": {
+        "builder": lambda run_cfg, domain: Hill48Model(
+            elastic=ElasticModel(run_cfg["E"], run_cfg["nu"], tdim=domain.topology.dim),
+            sigma_Y=run_cfg["sigma_Y"],
+            G=run_cfg["G"],
+            F=run_cfg["F"],
+            H=1 - run_cfg["G"],
+            L=run_cfg["L"],
+            M=run_cfg["M"],
+            N=run_cfg["N"],
+            Q_var=run_cfg["Q_var"],
+            k_hardening=run_cfg["k_hardening"],
+        ),
+        "params_default": {
+            "t_start": 0.0,
+            "E": 200_000.0,
+            "nu": 0.3,
+            "sigma_Y": 100.0,
+            "Q_var": 50.0,
+            "k_hardening": 1_000.0,
+            "F": 0.500,
+            "G": 0.500,
+            "L": 1.500,
+            "M": 1.500,
+            "N": 1.50,
+            "ux_up": 0.0,
+            "uy_up": 0.01,
+            "uz_up": 0.0,
+            "ux_down": 0.0,
+            "uy_down": -0.01,
+            "uz_down": 0.0,
+        },
+        "bounds": {
+            "t_start": (-0.2, 0.5),
+            "E": (150_000.0, 250_000.0),
+            "nu": (0.2, 0.45),
+            "sigma_Y": (20.0, 300.0),
+            "Q_var": (0.0, 300.0),
+            "k_hardening": (10.0, 5_000.0),
+            "F": (0.0, 1.0),
+            "G": (0.0, 1.0),
+            "L": (0.1, 5.0),
+            "M": (0.1, 5.0),
+            "N": (0.1, 5.0),
             "ux_up": (-0.01, 0.01),
             "uy_up": (0.0001, 0.05),
             "uz_up": (-0.01, 0.01),
@@ -55,6 +160,7 @@ MODEL_REGISTRY = {
         },
     },
 }
+
 
 # ---------------------------------------------------------------------------
 # 2. Calcul des résidus mixtes (Déplacement DIC + Force)
@@ -66,7 +172,7 @@ def compute_u_f_residuals_is_imported(
         f_ref, 
         f_sim, 
         vtu_function_name="displacement_projected",
-        sim_function_name=None,  # Si le nom dans la simu diffère de la ref
+        sim_function_name=None,
         weight_u=1.0,
         weight_f=1.0,
         normalize=True):
@@ -77,11 +183,9 @@ def compute_u_f_residuals_is_imported(
     
     num_steps = min(len(ref_multiblock), len(sim_multiblock), len(f_ref), len(f_sim))
     
-    # Nom du champ dans la simulation (par défaut le même que la référence)
     if sim_function_name is None:
         sim_function_name = vtu_function_name
 
-    # Diagnostic au premier pas si la clé manque
     ref_grid_0 = ref_multiblock[0]
     sim_grid_0 = sim_multiblock[0]
 
@@ -100,7 +204,6 @@ def compute_u_f_residuals_is_imported(
         ref_grid = ref_multiblock[t]
         sim_grid = sim_multiblock[t]
         
-        # Filtre sur la zone mesurée par DIC
         if "is_imported" in ref_grid.point_data:
             is_imported = ref_grid.point_data["is_imported"]
             mask_imported = np.isclose(is_imported, 0.1, atol=1e-6)
@@ -121,7 +224,7 @@ def compute_u_f_residuals_is_imported(
         
     res_u = np.concatenate(res_u_list)
     res_f = (f_sim[:num_steps] - f_ref[:num_steps]).ravel()
-
+    
     if normalize:
         scale_u = np.std(res_u) if np.std(res_u) > 1e-12 else 1.0
         scale_f = np.std(f_ref[:num_steps]) if np.std(f_ref[:num_steps]) > 1e-12 else 1.0
@@ -137,6 +240,93 @@ def compute_u_f_residuals_is_imported(
 
     return np.concatenate([res_u, res_f])
 
+
+def compute_u_f_residuals_is_imported_test(
+        ref_multiblock, 
+        sim_multiblock, 
+        f_ref, 
+        f_sim, 
+        vtu_function_name="displacement_projected",
+        sim_function_name=None,
+        weight_u=1.0,
+        weight_f=1.0,
+        normalize=True):
+    
+    if sim_function_name is None:
+        sim_function_name = vtu_function_name
+
+    f_ref = np.asarray(f_ref, dtype=np.float64)
+    f_sim = np.asarray(f_sim, dtype=np.float64)
+    
+    num_steps = min(len(ref_multiblock), len(sim_multiblock), len(f_ref), len(f_sim))
+
+    # Verification des champs au premier pas de temps
+    ref_grid_0 = ref_multiblock[0]
+    sim_grid_0 = sim_multiblock[0]
+
+    if vtu_function_name not in ref_grid_0.point_data:
+        raise KeyError(
+            f"Champ '{vtu_function_name}' introuvable dans REF point_data. "
+            f"Cles disponibles dans REF : {list(ref_grid_0.point_data.keys())}"
+        )
+    if sim_function_name not in sim_grid_0.point_data:
+        raise KeyError(
+            f"Champ '{sim_function_name}' introuvable dans SIM point_data. "
+            f"Cles disponibles dans SIM : {list(sim_grid_0.point_data.keys())}"
+        )
+
+    u_ref_list = []
+    res_u_list = []
+
+    for t in range(num_steps):
+        ref_grid = ref_multiblock[t]
+        sim_grid = sim_multiblock[t]
+        
+        # Masque is_imported (defaut = tous les nœuds)
+        if "is_imported" in ref_grid.point_data:
+            is_imported = ref_grid.point_data["is_imported"]
+            mask_imported = np.isclose(is_imported, 0.1, atol=1e-6)
+        else:
+            mask_imported = np.ones(ref_grid.n_points, dtype=bool)
+            
+        # Masque plan z = 0 si maillage 3D
+        if ref_grid.points.shape[1] >= 3:
+            mask_z = np.isclose(ref_grid.points[:, 2], 0.0, atol=1e-6)
+            mask = mask_imported & mask_z
+        else:
+            mask = mask_imported
+
+        # Extraction des sous-champs
+        u_ref_t = ref_grid.point_data[vtu_function_name][mask].ravel()
+        u_sim_t = sim_grid.point_data[sim_function_name][mask].ravel()
+        
+        diff_u = u_sim_t - u_ref_t
+        
+        u_ref_list.append(u_ref_t)
+        res_u_list.append(diff_u)
+        
+    u_ref_all = np.concatenate(u_ref_list)
+    res_u = np.concatenate(res_u_list)
+    res_f = (f_sim[:num_steps] - f_ref[:num_steps]).ravel()
+
+    if normalize:
+        # Calcul des echelles sur les signaux de reference (valeurs fixes)
+        std_u_ref = np.std(u_ref_all)
+        std_f_ref = np.std(f_ref[:num_steps])
+
+        scale_u = std_u_ref if std_u_ref > 1e-12 else 1.0
+        scale_f = std_f_ref if std_f_ref > 1e-12 else 1.0
+        
+        norm_factor_u = (1.0 / (scale_u * np.sqrt(len(res_u)))) * weight_u
+        norm_factor_f = (1.0 / (scale_f * np.sqrt(len(res_f)))) * weight_f
+        
+        res_u = res_u * norm_factor_u
+        res_f = res_f * norm_factor_f
+    else:
+        res_u = res_u * weight_u
+        res_f = res_f * weight_f
+
+    return np.concatenate([res_u, res_f])
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +345,8 @@ def compute_residuals_generic_DIC_BC(
 
     # Fusion des paramètres optimisés et fixes
     full_params = {**fixed_params, **dict(zip(free_param_names, free_param_values))}
+    
+    # full_params surcharge cfg (donc le t_start optimisé écrase tout t_start par défaut)
     run_cfg = {**cfg, **full_params}
 
     # Reconstitution des vecteurs 3D [ux, uy, uz]
@@ -202,7 +394,7 @@ def compute_residuals_generic_DIC_BC(
     except Exception as e:
         print(f"--> [Simulation/Newton Divergence] Exception : {e}. Pénalisation de l'erreur.")
         error = np.ones(expected_total_size) * 1e3
-        f_sim = np.zeros_like(f_ref) # Sécurité en cas de divergence
+        f_sim = np.zeros_like(f_ref)
 
     return error, f_sim
 
@@ -263,15 +455,13 @@ def femu_res_generic(
     cfg = {
         "pvd_file_path": PVD_FILE,
         "num_steps": len(vtu_files) - 1,
-        "t_start": 0.0,
         "T": 3.0,
-        "weight_u": 1.0,  # Pondération relative U
-        "weight_f": 1.0,  # Pondération relative Force
+        "weight_u": 1.0,
+        "weight_f": 1.0,
         **(config or {})
     }
 
     n_free = len(free_param_names)
-    # On ajoute 2 emplacements réservés : 1 pour les résidus + 1 pour la courbe de force
     n_total_plots = n_free + 2
     n_cols = 4
     n_rows = int(np.ceil(n_total_plots / n_cols))
@@ -280,16 +470,12 @@ def femu_res_generic(
     fig = plt.figure(figsize=(4 * n_cols, 3.5 * n_rows))
     gs = fig.add_gridspec(n_rows, n_cols)
 
-    # Graphique 1 (gs[0, 0]) : Convergence des résidus
     ax_err = fig.add_subplot(gs[0, 0])
-    
-    # Graphique 2 (gs[0, 1]) : Fitting Force / Pas de temps
     ax_force = fig.add_subplot(gs[0, 1])
 
-    # Graphiques 3 à N : Évolution des paramètres
     ax_params = []
     for i in range(n_free):
-        slot_idx = i + 2  # Décalage de 2 slots
+        slot_idx = i + 2
         row, col = divmod(slot_idx, n_cols)
         ax_params.append(fig.add_subplot(gs[row, col]))
 
@@ -307,7 +493,6 @@ def femu_res_generic(
         if fixed_params:
             print("Paramètres fixes :", fixed_params)
 
-        # Récupération des résidus ET de la force simulée
         residuals, f_sim = compute_residuals_generic_DIC_BC(
             domain, V, W, WT, f_ref, ref_multiblock,
             model_name=model_name,
@@ -323,14 +508,12 @@ def femu_res_generic(
         data_p = np.array(history_params)
 
         try:
-            # --- 1. Graphique Erreur globale ---
             ax_err.clear()
             ax_err.plot(history_err, color='firebrick', lw=1.5)
             ax_err.set_yscale('log')
             ax_err.set_title(r"Norme Résidus (Log $\sum r^2$)")
             ax_err.grid(True, which="both", ls="-", alpha=0.2)
 
-            # --- 2. Graphique Fitting Force / Pas de temps ---
             ax_force.clear()
             steps_ref = np.arange(len(f_ref))
             steps_sim = np.arange(len(f_sim))
@@ -342,7 +525,6 @@ def femu_res_generic(
             ax_force.legend(fontsize=8)
             ax_force.grid(True, alpha=0.2)
 
-            # --- 3. Graphiques Paramètres ---
             for i, name in enumerate(free_param_names):
                 ax_params[i].clear()
                 ax_params[i].plot(data_p[:, i], color='royalblue')
@@ -355,8 +537,6 @@ def femu_res_generic(
             print(f"Erreur d'affichage : {e_plot}")
 
         print(f"Norme des résidus : {error_scalar:.6e}")
-        
-        # scipy.optimize.least_squares attend uniquement le tableau 1D de résidus
         return residuals
 
     result_norm = least_squares(
@@ -364,7 +544,7 @@ def femu_res_generic(
         params0_norm,
         method='trf',
         bounds=bounds_norm,
-        ftol=1e-6, gtol=1e-8, max_nfev=150, verbose=2, x_scale=1.0, diff_step=1e-2,
+        ftol=1e-6, gtol=1e-6, max_nfev=500, verbose=2, x_scale=1.0, diff_step=1e-2, xtol=None
     )
 
     plt.ioff()
@@ -382,8 +562,8 @@ def femu_res_generic(
 # 5. Point d'entrée
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    PVD_FILE = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd"
-    FORCE_FILE = "forces_sample.npy"
+    PVD_FILE = "MAINTEST/pyvista_exports/csv_projection_tensile_iso/dic_series_projected.pvd"
+    FORCE_FILE = "MAINTEST/pyvista_exports/csv_projection_tensile_iso/forces_sample.npy"
 
     print("Lancement de l'optimisation FEMU mixte (Champs u + Forces F)...")
 
@@ -392,12 +572,13 @@ if __name__ == "__main__":
         FORCE_FILE,
         model_name="J2IsotropicHardening",
         params0_overrides={
+            "t_start": 0.05,        # Valeur initiale testée pour t_start
             "sigma_Y": 90.0,
             "Q_var": 45.0,
             "k_hardening": 1_100.0,
-            
         },
         free_param_names=[
+            "t_start",            # <-- Ajouté aux paramètres libres
             "sigma_Y",
             "Q_var",
             "k_hardening",
@@ -413,8 +594,8 @@ if __name__ == "__main__":
             "uz_down": 0.0,
         },
         config={
-            "weight_u": 1.0,  # Ajustable si vous souhaitez donner plus de poids à la force ou au déplacement
-            "weight_f": 5.0,
+            "weight_u": 1.0,
+            "weight_f": 0.0,
         }
     )
 
