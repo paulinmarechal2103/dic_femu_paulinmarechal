@@ -97,72 +97,6 @@ def get_vtu_files_from_pvd(pvd_file_path):
         vtu_files.append(full_path)
         
     return vtu_files
-import meshio
-def dirichlet_bcs_from_vtu(domain, space, vtu_file_path, field_name="displacement_projected", tol_rugosite=5.0):
-    """
-    Build Dirichlet boundary conditions by interpolating a displacement field
-    stored in a VTU file onto the current domain.
-    """
-    tdim = domain.topology.dim
-    fdim = tdim - 1
-    gdim = domain.geometry.dim
-    vdim = space.dofmap.bs
-
-    # 1. Identification of the facets and DOFs of the top/bottom surfaces.
-    x_coords = domain.geometry.x[:, 1]
-    y_min, y_max = np.min(x_coords), np.max(x_coords)
-    domain.topology.create_connectivity(fdim, tdim)
-    boundary_facets = mesh.exterior_facet_indices(domain.topology)
-    facet_centers = mesh.compute_midpoints(domain, fdim, boundary_facets)
-
-    left_facets = boundary_facets[facet_centers[:, 1] <= (y_min + tol_rugosite)]
-    right_facets = boundary_facets[facet_centers[:, 1] >= (y_max - tol_rugosite)]
-
-    left_dofs = fem.locate_dofs_topological(space, fdim, left_facets)
-    right_dofs = fem.locate_dofs_topological(space, fdim, right_facets)
-
-    boundary_dofs = np.unique(np.concatenate([left_dofs, right_dofs]))
-
-    # 2. Read the data from the VTU file via meshio
-    
-    try:
-        m = meshio.read(vtu_file_path)
-    except Exception as e:
-        raise RuntimeError(f"Erreur lors de la lecture du fichier {vtu_file_path}: {e}")
-
-    points_parent = m.points
-    if field_name not in m.point_data:
-        raise KeyError(f"Le champ '{field_name}' est introuvable dans {vtu_file_path}. Champs disponibles: {list(m.point_data.keys())}")
-    vtu_data = m.point_data[field_name]
-
-    # 3. Build the KD-Tree over the full parent VTU mesh
-    tree = KDTree(points_parent[:, :gdim])
-
-    all_dof_coords = space.tabulate_dof_coordinates()
-    boundary_coords = all_dof_coords[boundary_dofs, :gdim]
-
-    distances, mapping_indices = tree.query(boundary_coords)
-
-    if np.max(distances) > 1e-5:
-        print(f"Attention: Écart max constaté de {np.max(distances)} sur les frontières pour le fichier {os.path.basename(vtu_file_path)}.")
-
-    # 4. Targeted filling of the u_boundary field.
-    u_boundary = fem.Function(space)
-    u_boundary.x.array[:] = 0.0
-
-    for comp in range(vdim):
-        dof_indices_flat = boundary_dofs * vdim + comp
-        u_boundary.x.array[dof_indices_flat] = vtu_data[mapping_indices, comp]
-
-    u_boundary.x.scatter_forward()
-
-    # 5. Apply the Dirichlet boundary conditions.
-    bc_left = fem.dirichletbc(u_boundary, left_dofs)
-    bc_right = fem.dirichletbc(u_boundary, right_dofs)
-    return [bc_left, bc_right] 
-
-
-
 
 def estimate_boundary_tol(domain, safety_factor=1.5):
     """
@@ -195,7 +129,102 @@ def estimate_boundary_tol(domain, safety_factor=1.5):
     tol = safety_factor * np.median(h_facets)
     return tol
 
+ 
+
+import meshio
+
+def dirichlet_bcs_from_vtu(domain, space, vtu_file_path, field_name="displacement_projected", tol_rugosite=None):
+    """
+    Construit les conditions aux limites de Dirichlet à partir d'un fichier VTU :
+    - Composantes X et Y imposées sur les surfaces haut et bas (axe Y).
+    - Composante Z bloquée uniquement sur 3 points au milieu de l'éprouvette (y = y_mid).
+    """
+    tdim = domain.topology.dim
+    fdim = tdim - 1
+    gdim = domain.geometry.dim
+    vdim = space.dofmap.bs
+
+    if gdim < 3 or vdim < 3:
+        raise ValueError("Cette fonction requiert un domaine et un espace fonctionnel 3D.")
+
+    # Estimation automatique de la tolérance si non fournie
+    if tol_rugosite is None:
+        tol_rugosite = estimate_boundary_tol(domain)
+
+    # 1. Identification des facettes et DOFs des surfaces haut/bas (selon Y)
+    y_coords = domain.geometry.x[:, 1]
+    y_min, y_max = np.min(y_coords), np.max(y_coords)
     
+    domain.topology.create_connectivity(fdim, tdim)
+    boundary_facets = mesh.exterior_facet_indices(domain.topology)
+    facet_centers = mesh.compute_midpoints(domain, fdim, boundary_facets)
+
+    left_facets = boundary_facets[facet_centers[:, 1] <= (y_min + tol_rugosite)]
+    right_facets = boundary_facets[facet_centers[:, 1] >= (y_max - tol_rugosite)]
+
+    left_dofs = fem.locate_dofs_topological(space, fdim, left_facets)
+    right_dofs = fem.locate_dofs_topological(space, fdim, right_facets)
+    boundary_dofs = np.unique(np.concatenate([left_dofs, right_dofs]))
+
+    # 2. Lecture du fichier VTU
+    try:
+        m = meshio.read(vtu_file_path)
+    except Exception as e:
+        raise RuntimeError(f"Erreur lors de la lecture du fichier {vtu_file_path}: {e}")
+
+    points_parent = m.points
+    if field_name not in m.point_data:
+        raise KeyError(f"Le champ '{field_name}' est introuvable dans {vtu_file_path}. Champs disponibles: {list(m.point_data.keys())}")
+    vtu_data = m.point_data[field_name]
+
+    # 3. Interpolation KDTree sur la frontière pour le champ de déplacement
+    tree = KDTree(points_parent[:, :gdim])
+    all_dof_coords = space.tabulate_dof_coordinates()
+    boundary_coords = all_dof_coords[boundary_dofs, :gdim]
+
+    distances, mapping_indices = tree.query(boundary_coords)
+
+    if np.max(distances) > 1e-5:
+        print(f"Attention: Écart max constaté de {np.max(distances)} sur les frontières pour {os.path.basename(vtu_file_path)}.")
+
+    # 4. Remplissage du champ u_boundary
+    u_boundary = fem.Function(space)
+    u_boundary.x.array[:] = 0.0
+
+    for comp in range(vdim):
+        dof_indices_flat = boundary_dofs * vdim + comp
+        u_boundary.x.array[dof_indices_flat] = vtu_data[mapping_indices, comp]
+
+    u_boundary.x.scatter_forward()
+
+    # 5. Conditions aux limites X et Y sur le haut et le bas
+    left_dofs_x = fem.locate_dofs_topological(space.sub(0), fdim, left_facets)
+    left_dofs_y = fem.locate_dofs_topological(space.sub(1), fdim, left_facets)
+    right_dofs_x = fem.locate_dofs_topological(space.sub(0), fdim, right_facets)
+    right_dofs_y = fem.locate_dofs_topological(space.sub(1), fdim, right_facets)
+
+    bc_left_x = fem.dirichletbc(u_boundary.sub(0), left_dofs_x)
+    bc_left_y = fem.dirichletbc(u_boundary.sub(1), left_dofs_y)
+    bc_right_x = fem.dirichletbc(u_boundary.sub(0), right_dofs_x)
+    bc_right_y = fem.dirichletbc(u_boundary.sub(1), right_dofs_y)
+
+    # 6. Condition u_z = 0 sur le plan z_mid
+    z_mid = (np.min(domain.geometry.x[:, 2]) + np.max(domain.geometry.x[:, 2])) / 2.0
+
+    def mid_plane_z(x):
+        return np.isclose(x[2], z_mid, atol=1e-3)
+
+    # Extraction du sous-espace effondré
+    V_z, _ = space.sub(2).collapse()
+    dofs_z_plane = fem.locate_dofs_geometrical((space.sub(2), V_z), mid_plane_z)
+
+    # On passe dofs_z_plane[0] qui est le numpy.ndarray d'indices DOFs
+    bc_z = fem.dirichletbc(PETSc.ScalarType(0.0), dofs_z_plane[0], space.sub(2))
+
+    return [bc_left_x, bc_left_y, bc_right_x, bc_right_y, bc_z]
+
+
+
 def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model: PlasticityModel = None):
     import pyvista as pv
     import dolfinx.plot

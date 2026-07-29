@@ -1016,7 +1016,7 @@ def run_simulation_fast(domain, V, W, WT, config=None, coord=1, model: Plasticit
 
     if fic is not None:
         fic.close()
-
+    print("p_max =", np.max(state.p_old.x.array), " | p_mean =", np.mean(state.p_old.x.array))
     return force_vec, displ_val
 
 
@@ -1338,7 +1338,7 @@ if __name__ == "__main__":
         t_start     = 0.0,
         T           = 3.0,
         num_steps   = 50,
-        load_amp    = 0.01,       # amplitude of the applied displacement
+        load_amp    = 0.1,       # amplitude of the applied displacement
         length      = 10.0,       # half-length of the specimen
         mesh_file   = "Flat_specimen_refined.msh",
         output_dir  = "results_plasticity",
@@ -1358,7 +1358,7 @@ if __name__ == "__main__":
     V, W, WT = build_function_spaces(domain)
 
     # ---- run simulation with relaxation phase ----------------------------
-    forces, _ = run_simulation_write(domain, V, W, WT, config=config)
+    forces, _ = run_simulation_fast(domain, V, W, WT, config=config)
     print("pas de soucis la team")
 
     # ---- plot reaction force vs. time step -------------------------------

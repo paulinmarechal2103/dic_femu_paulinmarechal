@@ -16,7 +16,7 @@ GMSH_FILE = "x65.msh"
 OUTPUT_XDMF = "MAINTEST/projection_cad_temporelle_mask.xdmf"
 
 import_csv = 1 # 1 pour importer les CSV, 0 pour ne pas le faire
-project_csv = 1 # 1 pour projeter, 0 pour ne pas le faire
+project_csv = 1# 1 pour projeter, 0 pour ne pas le faire
 femu = 0  # 1 pour lancer l'optimisation, 0 pour ne pas le faire
 
 
@@ -25,8 +25,9 @@ femu = 0  # 1 pour lancer l'optimisation, 0 pour ne pas le faire
 
 
 if import_csv == 1:
-    dossier_csv = "/home/pmarechal/Documents/synthetic_csv/fenicsx_surface_z0_csv"
-    file_prefix = "FE_z0_step_"
+    dossier_csv = "/home/pmarechal/Documents/synthetic_csv/ref_astar_50_cr_csv"
+    file_prefix = "ref_astar_50_cr_"
+
 
     process_csv_series_pyvista(
         folder_path=dossier_csv, 

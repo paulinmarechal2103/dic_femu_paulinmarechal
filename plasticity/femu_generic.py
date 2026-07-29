@@ -419,9 +419,9 @@ if __name__ == "__main__":
     seed(43)  # Pour la reproductibilité
     perturbation_percentage = 0.15  # 15% de perturbation aléatoire
     bounds_ref_J2_centr= [
-            (200000, 200000+1e-6),   # E [MPa]
-            (0.3, 0.3+1e-10),         # nu 
-            (10.0, 500.0),        # sigma_Y [MPa]
+            (190000, 210000),   # E [MPa]
+            (0.25, 0.35),         # nu 
+            (20.0, 500.0),        # sigma_Y [MPa]
             (5.0, 400.0),         # Q_var [MPa]
             (10.0, 1500.0),          # k_hardening
         ]
@@ -429,16 +429,19 @@ if __name__ == "__main__":
     normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
     normalized_disturbed = [min(max(i, 0.0), 1.0) for i in normalized_disturbed]  # Clamp entre 0 et 1
     parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2_centr)
-
+    print(parameters_disturbed)
     print("Lancement de l'optimisation FEMU via le pipeline PyVista...")
 
     # 4. Lancement de l'optimisation avec le fichier PVD
     optimizer_result = femu_res_generic(
             PVD_FILE,
             model_name="J2IsotropicHardening",
-            params0_overrides={"sigma_Y": parameters_disturbed[2], "Q_var": parameters_disturbed[3], "k_hardening": parameters_disturbed[4]},
-            free_param_names=["sigma_Y","Q_var", "k_hardening"],
-            fixed_param_overrides={"E": 200_000.0, "nu": 0.3},
+            params0_overrides={},
+            free_param_names=["E", "nu"],
+            fixed_param_overrides={"Q_var": 50, "k_hardening": 1000, "sigma_Y": 50},
+            # params0_overrides={ "Q_var": parameters_disturbed[3], "k_hardening": parameters_disturbed[4]},
+            # free_param_names=["Q_var", "k_hardening"],
+            # fixed_param_overrides={"E": 200_000.0, "nu": 0.3,"sigma_Y": 50},
         )
 
     
