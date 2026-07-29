@@ -59,6 +59,40 @@ MODEL_REGISTRY = {
             "k_hardening": (10.0, 5_000.0),
         },
     },
+    "Hill48_2": {
+        "builder": lambda run_cfg, domain: Hill48Model(
+            elastic=ElasticModel(run_cfg["E"], run_cfg["nu"], tdim=domain.topology.dim),
+            sigma_Y=run_cfg["sigma_Y"],
+            G=run_cfg["G"],
+            F=run_cfg["F"],
+            H=1 - run_cfg["G"],
+            L=1.5,
+            M=1.5,
+            N=run_cfg["N"],
+            Q_var=run_cfg["Q_var"],
+            k_hardening=run_cfg["k_hardening"],
+        ),
+        "params_default": {
+            "E": 200_000.0,
+            "nu": 0.3,
+            "sigma_Y": 100.0,
+            "Q_var": 50.0,
+            "k_hardening": 1_000.0,
+            "F": 0.500,
+            "G": 0.500,
+            "N": 1.50,
+        },
+        "bounds": {
+            "E": (150_000.0, 250_000.0),
+            "nu": (0.2, 0.45),
+            "sigma_Y": (20.0, 300.0),
+            "Q_var": (0.0, 300.0),
+            "k_hardening": (10.0, 5_000.0),
+            "F": (0.0, 1.0),
+            "G": (0.0, 1.0),
+            "N": (0.1, 5.0),
+        },
+    },
 
     # Exemple pour ajouter un autre modèle plus tard (à adapter/décommenter
     # une fois que tu as la classe correspondante) :

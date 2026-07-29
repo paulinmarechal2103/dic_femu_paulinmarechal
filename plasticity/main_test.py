@@ -1,6 +1,6 @@
 from dic_importation import *
 from image_calibration import *
-from femu_DIC import *
+from femu_generic import *
 
 from mpi4py import MPI
 from petsc4py import PETSc
@@ -8,31 +8,20 @@ from dolfinx import fem, io, log, mesh
 
 import os
 
-dossier_csv = "/home/pmarechal/Documents/X65_L/VCXU-51C_700005517948_260616-123640"
-file_prefix = "X65_L_000"
 
-H5_FILE = "MAINTEST/dic_series.h5"
-GMSH_FILE = "x65.msh"
-OUTPUT_XDMF = "MAINTEST/projection_cad_temporelle_mask.xdmf"
-
-import_csv = 1 # 1 pour importer les CSV, 0 pour ne pas le faire
-project_csv = 1# 1 pour projeter, 0 pour ne pas le faire
-femu = 0  # 1 pour lancer l'optimisation, 0 pour ne pas le faire
+project_csv = 0  # 1 pour projeter, 0 pour ne pas le faire
+femu = 1  # 1 pour lancer l'optimisation, 0 pour ne pas le faire
 
 
 
-
-
-
-if import_csv == 1:
-    dossier_csv = "/home/pmarechal/Documents/synthetic_csv/ref_astar_50_cr_csv"
-    file_prefix = "ref_astar_50_cr_"
-
-
-    process_csv_series_pyvista(
-        folder_path=dossier_csv, 
-        output_pvd="MAINTEST/pyvista_exports/csv_imports/dic_series.pvd", 
-        file_prefix=file_prefix, 
+print("hey")
+if project_csv == 1:
+    process_csv_series_to_cad_mesh(
+        folder_path="/home/pmarechal/Documents/synthetic_csv/carre_trou_y0_10_csv",
+        file_prefix="carre_trou_y0_10_", 
+        mesh_cad_path="carre_trou.msh", 
+        tform_h5_to_cad_4D = np.identity(4), 
+        output_pvd_path = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd",
         alpha=20.0,
         ech=1,
         start_idx = 0,
@@ -40,84 +29,29 @@ if import_csv == 1:
     )
 
 
-
-import os
-
-
-
-
-if project_csv == 1:
- 
-    print("=" * 60)
-    print("  VÉRIFICATION ET LANCEMENT DE LA PROJECTION TEMPORELLE")
-    print("=" * 60)
-
-    try:
-        # Exécution de la fonction globale de traitement
-        project_vtu_series_to_cad_mesh_mask(
-            input_pvd_path = "MAINTEST/pyvista_exports/csv_imports/dic_series.pvd", 
-            mesh_cad_path="Flat_specimen_refined.msh", 
-            tform_h5_to_cad_4D = np.identity(4), 
-            output_pvd_path = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd"
-        )
-        print("\n" + "=" * 60)
-        print("[Succès] Traitement terminé sans accroc.")
-        print(f"[Aide] Vous pouvez maintenant ouvrir dans ParaView")
-        print("       pour visualiser le déplacement projeté sur la CAO au cours du temps.")
-        print("=" * 60)
-        
-    except Exception as e:
-        print("\n" + "!" * 60)
-        print("[Échec] Une erreur est survenue pendant l'interpolation :")
-        print("!" * 60)
-        import traceback
-        traceback.print_exc()
-
-
 if femu == 1:
-    from random import uniform, seed
-    import numpy as np
-
-    # 1. Définition des bornes (inchangées)
-    bounds_ref_J2_centr= [
-            (200000, 200000+1e-6),   # E [MPa]
-            (0.3, 0.3+1e-10),         # nu 
-            (10.0, 500.0),        # sigma_Y [MPa]
-            (5.0, 400.0),         # Q_var [MPa]
-            (10.0, 1500.0),          # k_hardening
-        ]
-
-    # 2. Passage au fichier PVD (au lieu du XDMF)
     PVD_FILE = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd"
-    # PVD_FILE = "results/projection_cad_temporelle_mask.pvd"
-    
-    real_params = [200_000.0, 0.3, 100.0, 50.0, 1_000.0]
-    params_names = ["E", "nu", "sigma_Y", "Q_var", "k_hardening"]
-    
-    # 3. Génération de la perturbation (inchangée)
-    seed(43)  # Pour la reproductibilité
-    perturbation_percentage = 0.15  # 15% de perturbation aléatoire
-    
-    normalized_result = normalize_params(real_params, bounds_ref_J2_centr)
-    normalized_disturbed = [i + uniform(-perturbation_percentage, perturbation_percentage) for i in normalized_result]
-    normalized_disturbed = [min(max(i, 0.0), 1.0) for i in normalized_disturbed]  # Clamp entre 0 et 1
-    parameters_disturbed = denormalize_params(normalized_disturbed, bounds_ref_J2_centr)
-    
-    print("Paramètres initiaux perturbés (physiques) :", parameters_disturbed)
-    print("Lancement de l'optimisation FEMU via le pipeline PyVista...")
 
-    # 4. Lancement de l'optimisation avec le fichier PVD
-    optimizer_result = femu_res_J2_DIC_BC(
-        PVD_FILE, 
-        bounds=bounds_ref_J2_centr, 
-        params0=real_params,#parameters_disturbed,
-        params_names=params_names
+    print("Lancement de l'optimisation FEMU mixte (Champs u + Forces F) avec Hill48...")
+
+    optimizer_result = femu_res_generic(
+        PVD_FILE,
+        model_name="Hill48_2",
+        params0_overrides={
+            "G": 0.5,
+            "N": 1.5,
+        },
+        free_param_names=[
+            # Paramètres d'anisotropie à identifier
+            "G",
+            "N",
+        ],
+        fixed_param_overrides={
+            "Q_var":50,
+            "k_hardening":1000,
+            "E": 200_000.0,
+            "nu": 0.3,
+            "sigma_Y": 100.0,
+            "F" : 0.7
+        },
     )
-    
-    # 5. Affichage des résultats et calcul de l'erreur
-    print("\n================ OPTIMISATION TERMINÉE ================")
-    print("Optimized parameters (phys):", optimizer_result.x)
-    print("Normalized error:")
-    for i in range(len(real_params)):
-        err_percent = abs(optimizer_result.x[i] - real_params[i]) / abs(real_params[i]) * 100
-        print(f"  - {params_names[i]} : {err_percent:.5f}%")
