@@ -9,7 +9,7 @@ from dolfinx import fem, io, log, mesh
 import os
 
 
-project_csv = 0  # 1 pour projeter, 0 pour ne pas le faire
+project_csv = 0 # 1 pour projeter, 0 pour ne pas le faire
 femu = 1  # 1 pour lancer l'optimisation, 0 pour ne pas le faire
 
 
@@ -17,9 +17,9 @@ femu = 1  # 1 pour lancer l'optimisation, 0 pour ne pas le faire
 print("hey")
 if project_csv == 1:
     process_csv_series_to_cad_mesh(
-        folder_path="/home/pmarechal/Documents/synthetic_csv/butterfly_csv",
-        file_prefix="carre_trou_anisotrope_step_", 
-        mesh_cad_path="/home/pmarechal/Documents/geometries/butterfly.msh", 
+        folder_path="/home/pmarechal/Documents/synthetic_csv/carre_trou_ortho_y0_10_csv",
+        file_prefix="carre_trou_ortho_y0_10_", 
+        mesh_cad_path="carre_trou.msh", 
         tform_h5_to_cad_4D = np.identity(4), 
         output_pvd_path = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd",
         alpha=20.0,
@@ -30,7 +30,7 @@ if project_csv == 1:
     
 if femu == 1:
     PVD_FILE = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd"
-    FORCE_FILE = "MAINTEST/pyvista_exports/csv_projection/forces_anisotrope_butterfly.npy"
+    FORCE_FILE = "MAINTEST/pyvista_exports/csv_projection/forces_anisotrope_carre_trou.npy"
 
     print("Lancement de l'optimisation FEMU mixte (Champs u + Forces F) avec Hill48...")
 
@@ -45,30 +45,28 @@ if femu == 1:
         },
         free_param_names=[
             "t_start",
-            # Paramètres d'anisotropie à identifier
             "F",
             "G",
             "N",
-            # Conditions aux limites
+            "sigma_Y",
+            "Q_var",
+            "k_hardening",
             "uy_up",
             "uy_down",
             "ux_up",
             "ux_down",
         ],
         fixed_param_overrides={
-            "Q_var":50,
-            "k_hardening":1000,
             "E": 200_000.0,
             "nu": 0.3,
             "uz_up": 0.0,
             "uz_down": 0.0,
             "L": 1.5,
             "M": 1.5,
-            "sigma_Y": 100.0,
         },
         config={
             "weight_u": 1.0,
-            "weight_f": 1.0,
+            "weight_f": 4.0,
         }
     )
 

@@ -232,11 +232,11 @@ if __name__ == "__main__":
         t_start     = 0.0,
         T           = 3.0,
         num_steps   = 50,
-        load_amp    = 0.05,       # amplitude of the applied displacement
+        load_amp    = 0.025,       # amplitude of the applied displacement
         length      = 10.0,       # half-length of the specimen
-        mesh_file   = "/home/pmarechal/Documents/geometries/butterfly.msh",
+        mesh_file   = "carre_trou.msh",
         output_dir  = "results_plasticity",
-        file_name    = "butterfly",
+        file_name    = "carre_trou_ortho",
         # Elastic constants (used when no model is supplied)
         E           = 200_000.0,
         nu          = 0.3,
@@ -244,12 +244,12 @@ if __name__ == "__main__":
         sigma_Y     = 100.0,
         Q_var       = 50.0,
         k_hardening = 1000.0,
-        F = 0.700,  # Anisotropie dans le plan transverse
-        G = 0.600,  # Anisotropie dans le plan longitudinal
-        H = 0.400,  # Terme d'interaction (souvent proche
+        F = 0.250,  # AnisotrF,G,H,N,σ0,Q,k]opie dans le plan transverse
+        G = 0.3500,  # Anisotropie dans le plan longitudinal
+        H = 0.6500,  # Terme d'interaction (souvent proche
         L = 1.5,  # Cisaillement hors-plan
         M = 1.5,  # Cisaillement hors-plan
-        N = 1.350
+        N = 1.450
     )
     modèle_hill48 = Hill48Model(
         elastic=ElasticModel(config["E"], config["nu"], tdim=3),

@@ -113,7 +113,7 @@ MODEL_REGISTRY = {
             sigma_Y=run_cfg["sigma_Y"],
             G=run_cfg["G"],
             F=run_cfg["F"],
-            H=1 - run_cfg["G"],
+            H= 1 - run_cfg["G"],
             L=run_cfg["L"],
             M=run_cfg["M"],
             N=run_cfg["N"],
@@ -331,7 +331,73 @@ def compute_u_f_residuals_is_imported_test(
 
 # ---------------------------------------------------------------------------
 # 3. Fonction objectif de l'optimiseur
-# ---------------------------------------------------------------------------
+# # ---------------------------------------------------------------------------
+# def compute_residuals_generic_DIC_BC(
+#         domain, V, W, WT, f_ref, ref_multiblock,
+#         model_name, free_param_names, free_param_values, fixed_params,
+#         config=None):
+
+#     if model_name not in MODEL_REGISTRY:
+#         raise ValueError(f"Modèle inconnu : '{model_name}'. Disponibles : {list(MODEL_REGISTRY.keys())}")
+
+#     model_info = MODEL_REGISTRY[model_name]
+#     cfg = {**DEFAULT_CONFIG, **(config or {})}
+
+#     # Fusion des paramètres optimisés et fixes
+#     full_params = {**fixed_params, **dict(zip(free_param_names, free_param_values))}
+    
+#     # full_params surcharge cfg (donc le t_start optimisé écrase tout t_start par défaut)
+#     run_cfg = {**cfg, **full_params}
+
+#     # Reconstitution des vecteurs 3D [ux, uy, uz]
+#     run_cfg["disp_value_up"] = [
+#         run_cfg["ux_up"],
+#         run_cfg["uy_up"],
+#         run_cfg["uz_up"],
+#     ]
+#     run_cfg["disp_value_down"] = [
+#         run_cfg["ux_down"],
+#         run_cfg["uy_down"],
+#         run_cfg["uz_down"],
+#     ]
+
+#     model = model_info["builder"](run_cfg, domain)
+
+#     ref_grid = ref_multiblock[0]
+#     is_imported = ref_grid.point_data.get("is_imported", np.ones(len(ref_grid.points)))
+#     mask_imported = np.isclose(is_imported, 0.1, atol=1e-6)
+#     if ref_grid.points.shape[1] >= 3:
+#         mask_z = np.isclose(ref_grid.points[:, 2], 0.0, atol=1e-6)
+#         n_masked = (mask_imported & mask_z).sum()
+#     else:
+#         n_masked = mask_imported.sum()
+
+#     active_comps_len = 2 if V.dofmap.bs >= 2 else 1
+#     expected_u_size = n_masked * active_comps_len * len(ref_multiblock)
+#     expected_f_size = len(ref_multiblock)
+#     expected_total_size = expected_u_size + expected_f_size
+
+#     try:
+#         f_sim, sim_multiblock = run_simulation_bc_vtu_fast(domain, V, W, WT, run_cfg, model=model)
+        
+#         vtu_function_name = run_cfg.get("vtu_function_name", "displacement_projected")
+#         weight_u = run_cfg.get("weight_u", 1.0)
+#         weight_f = run_cfg.get("weight_f", 1.0)
+        
+#         error = compute_u_f_residuals_is_imported(
+#             ref_multiblock, sim_multiblock, f_ref, f_sim,
+#             vtu_function_name="displacement_projected",
+#             sim_function_name="displacement",
+#             weight_u=weight_u,
+#             weight_f=weight_f
+#         )
+#     except Exception as e:
+#         print(f"--> [Simulation/Newton Divergence] Exception : {e}. Pénalisation de l'erreur.")
+#         error = np.ones(expected_total_size) * 1e3
+#         f_sim = np.zeros_like(f_ref)
+
+#     return error, f_sim
+
 def compute_residuals_generic_DIC_BC(
         domain, V, W, WT, f_ref, ref_multiblock,
         model_name, free_param_names, free_param_values, fixed_params,
@@ -372,7 +438,14 @@ def compute_residuals_generic_DIC_BC(
     else:
         n_masked = mask_imported.sum()
 
-    active_comps_len = 2 if V.dofmap.bs >= 2 else 1
+    vtu_function_name = run_cfg.get("vtu_function_name", "displacement_projected")
+
+    # FIX: Vérifier le nombre de composantes réelles dans le VTU (généralement 3 pour les vecteurs 3D VTK)
+    if vtu_function_name in ref_grid.point_data:
+        active_comps_len = ref_grid.point_data[vtu_function_name].shape[1]
+    else:
+        active_comps_len = 3
+
     expected_u_size = n_masked * active_comps_len * len(ref_multiblock)
     expected_f_size = len(ref_multiblock)
     expected_total_size = expected_u_size + expected_f_size
@@ -380,13 +453,12 @@ def compute_residuals_generic_DIC_BC(
     try:
         f_sim, sim_multiblock = run_simulation_bc_vtu_fast(domain, V, W, WT, run_cfg, model=model)
         
-        vtu_function_name = run_cfg.get("vtu_function_name", "displacement_projected")
         weight_u = run_cfg.get("weight_u", 1.0)
         weight_f = run_cfg.get("weight_f", 1.0)
         
         error = compute_u_f_residuals_is_imported(
             ref_multiblock, sim_multiblock, f_ref, f_sim,
-            vtu_function_name="displacement_projected",
+            vtu_function_name=vtu_function_name,
             sim_function_name="displacement",
             weight_u=weight_u,
             weight_f=weight_f
@@ -397,8 +469,6 @@ def compute_residuals_generic_DIC_BC(
         f_sim = np.zeros_like(f_ref)
 
     return error, f_sim
-
-
 # ---------------------------------------------------------------------------
 # 4. Boucle FEMU principale
 # ---------------------------------------------------------------------------
@@ -544,7 +614,7 @@ def femu_res_generic(
         params0_norm,
         method='trf',
         bounds=bounds_norm,
-        ftol=1e-6, gtol=1e-6, max_nfev=500, verbose=2, x_scale=1.0, diff_step=1e-2, xtol=None
+        ftol=1e-7, gtol=1e-8, max_nfev=500, verbose=2, x_scale=1.0, diff_step=5e-3, xtol=None
     )
 
     plt.ioff()
@@ -595,7 +665,7 @@ if __name__ == "__main__":
         },
         config={
             "weight_u": 1.0,
-            "weight_f": 0.0,
+            "weight_f": 1.0,
         }
     )
 
