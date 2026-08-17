@@ -227,7 +227,7 @@ def process_csv_series_to_cad_mesh(
     folder_path: str,
     file_prefix: str,
     mesh_cad_path: str,
-    tform_h5_to_cad_4D: np.ndarray,
+    tform_img_to_cad_4D: np.ndarray,
     output_pvd_path: str,
     alpha: float = 0.2,
     ech: int = 20,
@@ -246,7 +246,7 @@ def process_csv_series_to_cad_mesh(
         CSV filename prefix (e.g. "FE_step_").
     mesh_cad_path : str
         Path to CAD mesh (.msh or VTK file).
-    tform_h5_to_cad_4D : np.ndarray (4, 4)
+    tform_img_to_cad_4D : np.ndarray (4, 4)
         Homogeneous transformation matrix mapping DIC space to CAD space.
     output_pvd_path : str
         Output path for the generated PVD collection manifest.

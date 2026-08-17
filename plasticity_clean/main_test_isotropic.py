@@ -43,7 +43,7 @@ if project_csv == 1:
         folder_path="/home/pmarechal/Documents/synthetic_csv/carre_trou_ortho_y0_10_csv",
         file_prefix="carre_trou_ortho_y0_10_",
         mesh_cad_path="carre_trou.msh",
-        tform_h5_to_cad_4D=np.identity(4),
+        tform_img_to_cad_4D=np.identity(4),
         output_pvd_path="MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd",
         alpha=20.0,
         ech=1,

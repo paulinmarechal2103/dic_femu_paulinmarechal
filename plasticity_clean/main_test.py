@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 force_export = 0
 
 project_csv = 0   # Set to 1 to run DIC CSV projection onto CAD, 0 to skip
-femu        = 1  # Set to 1 to run FEMU parameter identification, 0 to skip
+femu        = 1 # Set to 1 to run FEMU parameter identification, 0 to skip
 
 
 
@@ -101,7 +101,12 @@ if force_export == 1:
     plt.show()
 
 
-T = np.load('calibration_matrix.npy')
+# ---------------------------------------------------------------------------
+# Import 4x4 calibration matrix
+# ---------------------------------------------------------------------------
+
+T = np.load('calibration_matrix_A305.npy')  # Load the calibration matrix from a .npy file generated with test_calibration.py
+
 # ---------------------------------------------------------------------------
 # Stage 1 – Project DIC CSV series onto CAD mesh
 # ---------------------------------------------------------------------------
@@ -111,7 +116,7 @@ if project_csv == 1:
         folder_path="/home/pmarechal/Documents/A305/A305_rectangle",
         file_prefix="test00",
         mesh_cad_path="/home/pmarechal/Documents/projet_dic/plasticity/A305_COARSE.msh",
-        tform_h5_to_cad_4D=np.linalg.inv(T),  # Use the inverse of the calibration matrix because T maps from CAD to image coordinates, but we need the opposite for projection.
+        tform_img_to_cad_4D=np.linalg.inv(T),  # Use the inverse of the calibration matrix because T maps from CAD to image coordinates, but we need the opposite for projection.
         output_pvd_path="MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd",
         alpha=20.0,
         ech=108,
@@ -135,7 +140,11 @@ if femu == 1:
         FORCE_FILE,
         model_name="J2IsotropicHardening",
         params0_overrides={
-            "k_hardening":50.0
+            "k_hardening":300.0,
+            "sigma_Y": 700.0,
+            'Q_var': 200.0,
+            "uy_down": -1.0,
+            "uy_up": 1.0,
             # Initial guess overrides can be specified here
         },
         free_param_names=[      # Initial time offset
@@ -145,25 +154,29 @@ if femu == 1:
             "uy_up",        # Prescribed displacement rate (top boundary, Y)
             "uy_down",      # Prescribed displacement rate (bottom boundary, Y)
             "ux_up",        # Prescribed displacement rate (top boundary, X)
-            "ux_down", 
-            "E"     # Prescribed displacement rate (bottom boundary, X)
+            "ux_down",  # Prescribed displacement rate (bottom boundary, X)
         ],
         fixed_param_overrides={
 
             "t_start":0.0,
-            #"E":      210_000.0, # Fixed Young's modulus [MPa]
+            "E":      200_000.0, # Fixed Young's modulus [MPa]
             "nu":     0.3,       # Fixed Poisson ratio
             "uz_up":  0.0,       # Fixed top boundary Z displacement rate
             "uz_down":0.0,       # Fixed bottom boundary Z displacement rate
         },
         config={
             "T" : 3.0,
-            "weight_u": 1.0,     # Kinematic field error weighting
-            "weight_f": 0.0,     # Force discrepancy weighting
+            "weight_u": 5.0,     # Kinematic field error weighting
+            "weight_f": 1.0,     # Force discrepancy weighting
         },
         bounds_overrides={
-            "k_hardening":(0.0,200.0),
-            "E":(200000,500000)
+            "k_hardening":(30.0,1500.0),
+            'sigma_Y':(180,800),
+            'Q_var':(100.0, 800.0),
+            "ux_up":       (-0.01, 0.01),
+            "uy_up":       (0.1, 5),
+            "ux_down":     (-0.01, 0.01),
+            "uy_down":     (-5, -0.1),
         },
     )
 
