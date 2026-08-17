@@ -9,8 +9,8 @@ from dolfinx import fem, io, log, mesh
 import os
 
 
-project_csv = 0 # 1 pour projeter, 0 pour ne pas le faire
-femu = 1  # 1 pour lancer l'optimisation, 0 pour ne pas le faire
+project_csv = 1 # 1 pour projeter, 0 pour ne pas le faire
+femu = 0  # 1 pour lancer l'optimisation, 0 pour ne pas le faire
 
 
 
@@ -19,7 +19,7 @@ if project_csv == 1:
     process_csv_series_to_cad_mesh(
         folder_path="/home/pmarechal/Documents/synthetic_csv/carre_trou_ortho_y0_10_csv",
         file_prefix="carre_trou_ortho_y0_10_", 
-        mesh_cad_path="carre_trou.msh", 
+        mesh_cad_path="A305.msh", 
         tform_h5_to_cad_4D = np.identity(4), 
         output_pvd_path = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd",
         alpha=20.0,

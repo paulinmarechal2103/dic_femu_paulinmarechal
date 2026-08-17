@@ -569,21 +569,21 @@ def create_2D_mesh(msh, cell_type):
 #     domain.topology.create_connectivity(domain.topology.dim, domain.topology.dim - 1)
 #     return domain
 
-
 def load_and_write_mesh(mesh_file):
     """
-    Read a Gmsh .msh file, detect if it is 2D or 3D,
-    write appropriate XDMF sub-meshes, and return the dolfinx domain.
+    Read a Gmsh .msh file, detect if it is 2D or 3D (supporting tetra, hexahedra,
+    triangle, and quad elements), write appropriate XDMF sub-meshes, and return 
+    the dolfinx domain.
 
-    Dimension detection
-    -------------------
-    - If 'tetra' cells are present  → 3-D problem; domain = tetra, boundary = triangle.
-    - If only 'triangle' cells      → 2-D problem; domain = triangle, boundary = line.
+    Dimension & Cell Detection
+    --------------------------
+    - 3-D: 'hexahedron' → boundary = quad | 'tetra' → boundary = triangle
+    - 2-D: 'quad' or 'triangle' → boundary = line
 
     MPI strategy
     ------------
     Only rank 0 performs I/O (meshio read + XDMF write).
-    A MPI_Barrier ensures all ranks wait before reading the shared XDMF.
+    An MPI_Barrier ensures all ranks wait before reading the shared XDMF.
 
     Parameters
     ----------
@@ -597,34 +597,46 @@ def load_and_write_mesh(mesh_file):
     Raises
     ------
     ValueError
-        If the mesh contains neither 'tetra' nor 'triangle' cells.
+        If the mesh contains no supported 2D or 3D cell types.
     """
     if MPI.COMM_WORLD.rank == 0:
         msh = meshio.read(mesh_file)
 
-        # Auto-detect spatial dimension from cell types present in the file
-        has_tetra    = any(cell.type == "tetra"    for cell in msh.cells)
-        has_triangle = any(cell.type == "triangle" for cell in msh.cells)
+        # Detect cell types present in the mesh file
+        has_hex      = any(cell.type == "hexahedron" for cell in msh.cells)
+        has_tetra    = any(cell.type == "tetra"      for cell in msh.cells)
+        has_quad     = any(cell.type == "quad"       for cell in msh.cells)
+        has_triangle = any(cell.type == "triangle"   for cell in msh.cells)
 
-        if has_tetra:
-            print(f"[Mesh Loader] Détection d'un maillage 3D ({mesh_file})")
-            # 3-D: volumetric cells = tetrahedra; surface boundary = triangles
-            domain_mesh   = create_mesh(msh, "tetra",    prune_z=False)
-            boundary_mesh = create_mesh(msh, "line",     prune_z=False)
-        elif has_triangle:
-            print(f"[Mesh Loader] Détection d'un maillage 2D ({mesh_file})")
-            # 2-D: surface cells = triangles; edge boundary = lines
-            # prune_z=True is critical to give dolfinx a proper 2-D coordinate array
-            domain_mesh   = create_2D_mesh(msh, "triangle")
-            boundary_mesh = create_2D_mesh(msh, "line")
+        if has_hex or has_tetra:
+            # 3-D elements
+            domain_type   = "hexahedron" if has_hex else "tetra"
+            boundary_type = "quad"       if has_hex else "triangle"
+
+            print(f"[Mesh Loader] Détection d'un maillage 3D ({domain_type}) ({mesh_file})")
+            domain_mesh   = create_mesh(msh, domain_type,   prune_z=False)
+            boundary_mesh = create_mesh(msh, boundary_type, prune_z=False)
+
+        elif has_quad or has_triangle:
+            # 2-D elements
+            domain_type   = "quad" if has_quad else "triangle"
+            boundary_type = "line"
+
+            print(f"[Mesh Loader] Détection d'un maillage 2D ({domain_type}) ({mesh_file})")
+            domain_mesh   = create_2D_mesh(msh, domain_type)
+            boundary_mesh = create_2D_mesh(msh, boundary_type)
+
         else:
-            raise ValueError("Le maillage ne contient ni 'tetra' ni 'triangle'. Format non supporté.")
+            raise ValueError(
+                "Le maillage ne contient aucun élément supporté "
+                "('hexahedron', 'tetra', 'quad', 'triangle')."
+            )
 
         # Write XDMF files that all MPI ranks will subsequently read
         meshio.write("mesh.xdmf", domain_mesh)
         meshio.write("mt.xdmf",   boundary_mesh)
 
-    # Ensure rank 0 has finished writing before other ranks try to read
+    # Ensure rank 0 finishes writing before other ranks read
     MPI.COMM_WORLD.Barrier()
 
     with io.XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "r") as xdmf:
@@ -633,7 +645,6 @@ def load_and_write_mesh(mesh_file):
     # Build facet–cell connectivity needed for boundary-condition marking
     domain.topology.create_connectivity(domain.topology.dim, domain.topology.dim - 1)
     return domain
-
 
 # ===========================================================================
 # Function spaces
@@ -1338,9 +1349,9 @@ if __name__ == "__main__":
         t_start     = 0.0,
         T           = 3.0,
         num_steps   = 50,
-        load_amp    = 0.01,       # amplitude of the applied displacement
+        load_amp    = 0.001,       # amplitude of the applied displacement
         length      = 10.0,       # half-length of the specimen
-        mesh_file   = "Flat_specimen_refined.msh",
+        mesh_file   = "A305.msh",
         output_dir  = "results_plasticity",
         file_name    = "ref_astar",
         # Elastic constants
