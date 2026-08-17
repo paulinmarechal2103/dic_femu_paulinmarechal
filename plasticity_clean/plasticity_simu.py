@@ -310,8 +310,7 @@ def run_simulation_bc_vtu_fast(domain, V, W, WT, config=None, coord=1, model=Non
 
         # Assemble scalar reaction force (integral of σ_yy over upper boundary facet ds(1))
         stress    = model.elastic.sigma(eps - (delta_eps_p + state.eps_p_old))
-        local_force = fem.assemble_scalar(fem.form(stress[1, 1] * ds(1)))
-        force = domain.comm.allreduce(local_force, op=MPI.SUM)
+        force = fem.assemble_scalar(fem.form(stress[1, 1] * ds(1)))
         force_vec.append(force)
 
         # Commit plastic state variables in-place to step t+dt
