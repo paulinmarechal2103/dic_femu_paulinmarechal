@@ -380,7 +380,7 @@ if __name__ == "__main__":
         sigma_Y     = 400.0,
         Q_var       = 200.0,
         k_hardening = 50.0,
-        pvd_file_path     = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected_A305.pvd",
+        pvd_file_path     = "MAINTEST/pyvista_exports/csv_projection_full/dic_series_projected_A305.pvd",
         vtu_function_name = "displacement_projected"
     )
     from time import time

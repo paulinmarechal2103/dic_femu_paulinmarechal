@@ -402,7 +402,7 @@ def compute_residuals_generic_DIC_BC(
         
         weight_u = run_cfg.get("weight_u", 1.0)
         weight_f = run_cfg.get("weight_f", 1.0)
-        
+        f_sim = 4*np.array(f_sim) #symetry
         error = compute_u_f_residuals_is_imported(
             ref_multiblock, sim_multiblock, f_ref, f_sim,
             vtu_function_name="displacement_projected",

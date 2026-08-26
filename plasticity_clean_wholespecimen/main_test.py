@@ -143,8 +143,8 @@ if femu == 1:
             "k_hardening":300.0,
             "sigma_Y": 700.0,
             'Q_var': 200.0,
-            "uy_down": -1.0,
-            "uy_up": 1.0,
+            "uy_down": -0.1,
+            "uy_up": 0.1,
             # Initial guess overrides can be specified here
         },
         free_param_names=[      # Initial time offset
@@ -174,9 +174,9 @@ if femu == 1:
             'sigma_Y':(180,1000),
             'Q_var':(100.0, 1000.0),
             "ux_up":       (-0.01, 0.01),
-            "uy_up":       (0.1, 5),
+            "uy_up":       (0.0, 5),
             "ux_down":     (-0.01, 0.01),
-            "uy_down":     (-5, -0.1),
+            "uy_down":     (-5, -0.0),
         },
     )
 

@@ -33,8 +33,8 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------
 
 
-project_csv = 1   # Set to 1 to run DIC CSV projection onto CAD, 0 to skip
-femu        = 0 # Set to 1 to run FEMU parameter identification, 0 to skip
+project_csv = 0   # Set to 1 to run DIC CSV projection onto CAD, 0 to skip
+femu        = 1 # Set to 1 to run FEMU parameter identification, 0 to skip
 
 
 # ---------------------------------------------------------------------------
@@ -88,10 +88,11 @@ if femu == 1:
             "Q_var",
             "k_hardening",
             "sigma_Y",
-            "E",
         ],
         fixed_param_overrides={
             "nu": 0.3,
+
+            "E":210_000.0,
         },
         bounds_overrides={
             "k_hardening":(10.0,15000.0),

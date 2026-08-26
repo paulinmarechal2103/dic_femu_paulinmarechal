@@ -94,7 +94,7 @@ print(f"      Image loaded - shape {ref_img.shape}, dtype {ref_img.dtype}")
 # ---------------------------------------------------------------------------
 # 3. Run calibration
 # ---------------------------------------------------------------------------
-USE_MANUAL = True  # Set to False to use automatic DFT approach
+USE_MANUAL = True # Set to False to use automatic DFT approach
 
 print(
     "\n[3/4] Running calibration "
