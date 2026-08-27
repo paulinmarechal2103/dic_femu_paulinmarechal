@@ -27,14 +27,18 @@ from abc import ABC, abstractmethod
 import numpy as np
 import ufl
 from mpi4py import MPI
-from petsc4py import PETSc
-from dolfinx import fem, log, mesh
+from dolfinx import fem, mesh
 from dolfinx.mesh import locate_entities, meshtags
 from dolfinx.fem.petsc import NewtonSolverNonlinearProblem
 from dolfinx.nls.petsc import NewtonSolver
 import pyvista as pv
-from time import sleep
+from time import sleep, time
 
+import os
+import xml.etree.ElementTree as ET
+
+#import dolfinx
+from mpi4py import MPI
 
 # ===========================================================================
 # Elastic model
@@ -405,7 +409,6 @@ def build_solver(domain, V, model: PlasticityModel, state: PlasticState, bcs,
 
 
 
-
 def animer_deformee(multiblock, factor=10.0, component=None, fps=20):
     all_scalars = []
     for block in multiblock:
@@ -456,3 +459,141 @@ def animer_deformee(multiblock, factor=10.0, component=None, fps=20):
 
     print("Fenêtre finale active pour manipulation statique.")
     plotter.show()
+
+
+# ---------------------------------------------------------------------------
+# Default simulation configuration
+# ---------------------------------------------------------------------------
+DEFAULT_CONFIG = dict(
+    t_start     = 0.0,
+    T           = 3.0,
+    num_steps   = 50,
+    load_amp    = 0.01,       # Displacement amplitude per step
+    length      = 10.0,       # Half-length of specimen
+    mesh_file   = "Flat_specimen_refined.msh",
+    output_dir  = "results_plasticity",
+    file_name   = "res",
+    E           = 200_000.0,  # Young's modulus [MPa]
+    nu          = 0.3,        # Poisson ratio
+    sigma_Y     = 100.0,      # Yield stress [MPa]
+    Q_var       = 50.0,       # Isotropic hardening saturation stress [MPa]
+    k_hardening = 1000.0,     # Voce hardening rate parameter
+)
+
+
+# ---------------------------------------------------------------------------
+# Mesh loading from VTU
+# ---------------------------------------------------------------------------
+def load_domain_from_vtu(vtu_path, comm=MPI.COMM_WORLD):
+    """
+    Read a .vtu mesh file using PyVista and reconstruct a dolfinx.mesh.Mesh.
+
+    Supports 2D and 3D homogeneous element topologies (Triangles, Quads, 
+    Tetrahedra, Hexahedra).
+
+    Parameters
+    ----------
+    vtu_path : str
+        Path to the VTU mesh file.
+    comm : MPI.Comm
+        MPI communicator (default: MPI.COMM_WORLD).
+
+    Returns
+    -------
+    domain : dolfinx.mesh.Mesh
+        Reconstructed dolfinx mesh object.
+    """
+    import basix.ufl as basix_ufl
+
+    pv_mesh    = pv.read(vtu_path)
+    points     = pv_mesh.points   # Node coordinates array (N, 3)
+    cells_dict = pv_mesh.cells_dict
+
+    if not cells_dict:
+        raise ValueError("The VTU file contains no valid cells.")
+    if len(cells_dict) > 1:
+        raise ValueError("Mixed cell types are not supported.")
+
+    vtk_type, cells = list(cells_dict.items())[0]
+
+    # VTK numeric element code to dolfinx CellType mapping
+    VTK_TO_DOLFINX = {
+        5:  mesh.CellType.triangle,
+        9:  mesh.CellType.quadrilateral,
+        10: mesh.CellType.tetrahedron,
+        12: mesh.CellType.hexahedron,
+    }
+    if vtk_type not in VTK_TO_DOLFINX:
+        raise NotImplementedError(f"VTK type {vtk_type} is not yet mapped.")
+
+    cell_type          = VTK_TO_DOLFINX[vtk_type]
+    gdim               = points.shape[1]
+    coordinate_element = basix_ufl.element("Lagrange", cell_type.name, 1, shape=(gdim,))
+
+    # Create mesh passing (comm, cells, ufl_element, points)
+    domain = mesh.create_mesh(
+        comm, cells, ufl.Mesh(coordinate_element), points
+    )
+    return domain
+
+
+# ---------------------------------------------------------------------------
+# PVD parsing
+# ---------------------------------------------------------------------------
+def get_vtu_files_from_pvd(pvd_file_path):
+    """
+    Parse a VTK PVD manifest file to extract ordered VTU file paths.
+
+    Parameters
+    ----------
+    pvd_file_path : str
+        Path to the .pvd collection file.
+
+    Returns
+    -------
+    vtu_files : list of str
+        List of absolute file paths to all referenced VTU files in timestep order.
+    """
+    tree     = ET.parse(pvd_file_path)
+    root     = tree.getroot()
+    base_dir = os.path.dirname(pvd_file_path)
+    vtu_files = []
+    for dataset in root.iter("DataSet"):
+        file_rel_path = dataset.get("file")
+        vtu_files.append(os.path.join(base_dir, file_rel_path))
+    return vtu_files
+
+
+
+
+
+def estimate_boundary_tol(domain, safety_factor=1.5):
+    """
+    Estime une tolérance de capture des DOFs de bord basée sur la taille
+    locale des éléments au bord du maillage.
+    """
+    tdim = domain.topology.dim
+    fdim = tdim - 1
+    gdim = domain.geometry.dim
+
+    domain.topology.create_connectivity(fdim, tdim)
+    domain.topology.create_connectivity(fdim, 0)
+
+    boundary_facets = mesh.exterior_facet_indices(domain.topology)
+    f_to_v = domain.topology.connectivity(fdim, 0)
+    x = domain.geometry.x[:, :gdim]
+
+    h_facets = np.zeros(len(boundary_facets))
+    for i, facet in enumerate(boundary_facets):
+        verts = f_to_v.links(facet)
+        coords = x[verts]
+        if len(coords) > 1:
+            diffs = coords[:, None, :] - coords[None, :, :]
+            dists = np.linalg.norm(diffs, axis=-1)
+            h_facets[i] = dists.max()
+        else:
+            h_facets[i] = 0.0
+
+    h_facets = h_facets[h_facets > 0]
+    tol = safety_factor * np.median(h_facets)
+    return tol

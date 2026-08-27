@@ -1,22 +1,52 @@
 """
-femu_toolbox.py
-----------------
-Generic, solver-agnostic FEMU (Finite Element Model Updating) toolbox.
+FEMU parameter identification toolbox for DIC-based mechanical characterization.
 
-Unlike `femu_generic.py`, this module has no knowledge of any particular
-constitutive model: there is no `MODEL_REGISTRY` and no import of a
-specific material model class (`Hill48Model`, `J2IsotropicHardening`, ...).
-Instead, the user supplies their own finite-element `solver` callable,
-which is responsible for building whatever material model it needs from
-the current parameter set and for running the FE simulation.
+This module provides a generic Finite Element Model Updating (FEMU) pipeline
+for identifying constitutive model parameters (e.g. elastic and plastic
+hardening properties) by minimizing the mismatch between experimental
+Digital Image Correlation (DIC) measurements and finite element simulation
+results.
 
-This makes the toolbox reusable across projects/models: only the `solver`
-argument changes.
+The workflow combines:
+    - Full-field kinematic residuals, computed between experimental surface
+      displacement fields (loaded from PVD/VTU time series via PyVista) and
+      simulated displacement fields on the same mesh, restricted to nodes
+      flagged as valid DIC data (`is_imported`) on the imaged surface (z ≈ 0).
+    - Global force residuals, computed between an experimental reaction
+      force curve and the simulated reaction force history.
+    - A solver-agnostic interface: any callable with signature
+      `solver(run_cfg) -> (f_sim, sim_multiblock)` can be plugged in,
+      decoupling the optimization logic from the underlying physics model
+      (e.g. DOLFINx-based J2 plasticity solvers built with `simu_tools`).
 
-Public API
-~~~~~~~~~~
-femu_res_toolbox(PVD_file, FORCE_file, Optim_params, Bounds, solver, config=None)
-    -> scipy.optimize.OptimizeResult
+Key components
+--------------
+- Parameter normalization helpers (`normalize_params`, `denormalize_params`)
+  to map free parameters onto the unit hypercube [0, 1] for well-conditioned
+  optimization regardless of physical units/scales.
+- `compute_u_f_residuals_is_imported`: assembles the normalized, weighted
+  residual vector [res_u | res_f] from matched experimental/simulated
+  displacement and force data.
+- `compute_residuals_toolbox`: wraps a user-supplied solver call, merging
+  free and fixed parameters into a run configuration, and gracefully
+  falls back to a penalty residual vector if the solver fails to converge
+  or raises an exception.
+- `femu_res_toolbox`: the main entry point. Loads experimental DIC/force
+  data, splits parameters into free (bounded, optimized) and fixed sets,
+  and runs a bounded Trust-Region Reflective least-squares optimization
+  (`scipy.optimize.least_squares`) with live Matplotlib diagnostics
+  (residual norm convergence, force curve fit, and per-parameter
+  trajectories).
+
+Dependencies
+------------
+NumPy, SciPy (`optimize.least_squares`), PyVista (mesh/field I/O),
+Matplotlib (live plotting), and project-local modules `plasticity_simu`
+(mesh/config utilities) and `simu_tools` (function space construction).
+
+Typical usage involves defining a physics solver callable and calling
+`femu_res_toolbox` with experimental data paths, initial parameter guesses,
+and bounds for the subset of parameters to be identified.
 """
 
 # ---------------------------------------------------------------------------
@@ -30,9 +60,8 @@ import pyvista as pv
 from scipy.optimize import Bounds as ScipyBounds
 from scipy.optimize import least_squares
 
-from plasticity_simu import DEFAULT_CONFIG, get_vtu_files_from_pvd, load_domain_from_vtu
 from simu_tools import build_function_spaces
-
+from simu_tools import get_vtu_files_from_pvd, load_domain_from_vtu
 
 # ---------------------------------------------------------------------------
 # 1. Parameter normalisation helpers
@@ -135,7 +164,12 @@ def compute_u_f_residuals_is_imported(
     res_u_list = []
     f_ref = np.asarray(f_ref, dtype=np.float64)
     f_sim = np.asarray(f_sim, dtype=np.float64)
-    
+    f_sim = np.squeeze(f_sim)
+    f_ref = np.squeeze(f_ref)
+
+    # Si f_sim est une matrice (ex: 54x54), on extrait uniquement la composante utile
+    if f_sim.ndim > 1:
+        f_sim = f_sim[:, 0]  # ou np.diag(f_sim_1d) selon la structure de sortie de ton solveur
     num_steps = min(len(ref_multiblock), len(sim_multiblock), len(f_ref), len(f_sim))
     
     if sim_function_name is None:
@@ -196,7 +230,6 @@ def compute_u_f_residuals_is_imported(
     else:
         res_u = res_u * weight_u
         res_f = res_f * weight_f
-
     return np.concatenate([res_u, res_f])
 
 
@@ -212,12 +245,48 @@ def compute_residuals_toolbox(
     config=None,
 ):
     """
-    Recompose parameter set, invoke solver(run_cfg), and compute residuals.
+    Evaluate displacement and force residuals for optimization toolboxes with automated penalty fallback.
+
+    Assembles solver configuration parameters by combining defaults, fixed settings, and current
+    free parameter iterations. Executes the simulation solver wrapper and evaluates kinematic and
+    force residual errors relative to experimental DIC data. If solver execution fails, returns a 
+    high-penalty residual vector sized according to the DIC mesh mask.
+
+    Parameters
+    ----------
+    f_ref : array-like
+        Measured experimental force curve array.
+    ref_multiblock : pyvista.MultiBlock
+        Experimental DIC displacement fields across timesteps.
+    solver : callable
+        Callable simulation function accepting a configuration dictionary `run_cfg` and returning
+        a tuple `(f_sim, sim_multiblock)`.
+    free_param_names : sequence of str
+        Names of the active optimization parameters being evaluated.
+    free_param_values : sequence of float
+        Current numerical values for the active optimization parameters.
+    fixed_params : dict
+        Dictionary of non-optimised parameters to include in the solver configuration.
+    config : dict, optional
+        Base configuration options dictionary.
+
+    Returns
+    -------
+    error : np.ndarray
+        1D concatenated residual array `[res_u | res_f]`, or a 1D array filled with penalty 
+        values (`1e3`) on solver failure.
+    f_sim : np.ndarray
+        Simulated reaction force curve array, or a zero array matching `f_ref` shape on failure.
+
+    Raises
+    ------
+    TypeError
+        If `solver` is not callable.
     """
     if not callable(solver):
         raise TypeError("`solver` must be a callable with signature: solver(run_cfg)")
 
-    cfg = {**DEFAULT_CONFIG, **(config or {})}
+    cfg = {**(config or {})}
     full_params = {**fixed_params, **dict(zip(free_param_names, free_param_values))}
     run_cfg = {**cfg, **full_params}
 
@@ -231,10 +300,7 @@ def compute_residuals_toolbox(
     else:
         n_masked = mask_imported.sum()
 
-    # Determine vector dimension from reference data array shape
-    ref_field = ref_grid.point_data.get("displacement_projected", None)
-    active_comps_len = ref_field.shape[1] if (ref_field is not None and ref_field.ndim > 1) else 1
-
+    active_comps_len = 3 #TODO : IF ValueError "operands could not be broadcast together with shapes" CHANGE THIS
     expected_u_size = n_masked * active_comps_len * len(ref_multiblock)
     expected_f_size = len(ref_multiblock)
     expected_total_size = expected_u_size + expected_f_size
@@ -271,79 +337,63 @@ def femu_res_toolbox(
     Bounds,
     solver,
     config=None,
+    ftol=1e-7, gtol=1e-8, max_nfev=500, diff_step=5e-3, xtol=None,
 ):
     """
-    Identify material parameters by FEMU (Finite Element Model Updating),
-    fitting a user-supplied FE `solver` against experimental DIC
-    displacement fields and a measured force curve.
+    Execute Finite Element Model Updating (FEMU) parameter identification using non-linear least squares.
 
-    This function is fully model-agnostic: it doesn't know or care what
-    constitutive model is being fitted. That knowledge lives entirely in
-    `solver`, which the caller constructs (e.g. as a small wrapper/closure
-    around their own simulation routine).
+    Loads DIC reference displacement fields (PVD/VTU) and experimental force data, initializes DOLFINx
+    mesh domains and function spaces, and runs a Trust Region Reflective (`trf`) optimization via 
+    `scipy.optimize.least_squares`. Automatically separates parameters into free (optimized) and fixed 
+    sets based on provided bounds, normalizes free parameters to the [0, 1] interval during optimization, 
+    and renders live Matplotlib convergence plots for total residual norm, force curve matching, and 
+    parameter trajectories.
 
     Parameters
     ----------
-    PVD_file : str
-        Path to the .pvd file describing the reference DIC time series
-        (experimental displacement fields).
-    FORCE_file : str
-        Path to a .npy file containing the measured experimental force curve.
+    PVD_file : str or Path
+        Path to the PVD file referencing time-series experimental VTU mesh files.
+    FORCE_file : str or Path
+        Path to the `.npy` file containing experimental force measurements across timesteps.
     Optim_params : dict
-        Every material parameter involved in the simulation, mapped to a
-        single value each:
-          - for parameters to be identified, the value is the *initial
-            guess* used to start the optimization;
-          - for parameters that should stay constant, the value is the
-            *fixed value* used throughout the simulation.
-        Whether a parameter is free or fixed is decided by `Bounds` (see
-        below), not by its position in this dict.
-    Bounds : dict
-        `{param_name: (min, max)}` physical bounds for the parameters to
-        optimize. Only parameters that appear here (with a key also present
-        in `Optim_params`) are treated as free/optimized; every other key
-        in `Optim_params` is treated as fixed. `Bounds` must not contain
-        names that are absent from `Optim_params`.
+        Dictionary of parameter initial values and candidate parameters `{param_name: value}`.
+    Bounds : dict or None
+        Dictionary mapping parameter names to `(min, max)` physical bound tuples. Parameters present in 
+        `Bounds` are treated as free optimization variables; omitted parameters remain fixed.
     solver : callable
-        User-supplied finite-element solver with signature:
-
-            f_sim, sim_multiblock = solver(domain, V, W, WT, run_cfg)
-
-        where `run_cfg` is a dict merging `config`, the internal simulation
-        defaults, and every entry of `Optim_params` (fixed values plus the
-        free values currently being tested). The solver is responsible for
-        building whatever constitutive model it needs from `run_cfg` and
-        for returning the simulated reaction force curve and the simulated
-        displacement fields (as a `pyvista.MultiBlock`, with per-timestep
-        blocks exposing a `"displacement"` point-data field).
+        Callable simulation solver wrapper function accepting DOLFINx objects and runtime options.
     config : dict, optional
-        Additional simulation configuration options (e.g. number of load
-        steps, total simulated time `T`, residual weights `weight_u` /
-        `weight_f`, ...), merged on top of the internal defaults.
+        Base configuration options dictionary to override default solver settings (`num_steps`, `T`, weights).
+    ftol : float, default=1e-7
+        Tolerance for termination by relative change of the cost function in `scipy.optimize.least_squares`.
+    gtol : float, default=1e-8
+        Tolerance for termination by norm of the gradient in `scipy.optimize.least_squares`.
+    max_nfev : int, default=500
+        Maximum number of objective function evaluations.
+    diff_step : float or array-like, default=5e-3
+        Relative step size for finite-difference approximation of the Jacobian.
+    xtol : float or None, default=None
+        Tolerance for termination by change of the independent variables.
 
     Returns
     -------
-    scipy.optimize.OptimizeResult
-        Result of `scipy.optimize.least_squares`, with in addition:
-        - `x` : physical (denormalized) values of the identified
-          parameters, in the order of the free parameters found in
-          `Optim_params` / `Bounds`;
-        - `param_names` : names of the identified parameters, aligned
-          with `x`;
-        - `fixed_params` : dict of the parameters that were held fixed
-          and their value.
+    result_phys : scipy.optimize.OptimizeResult
+        SciPy optimization result object with `.x` converted back to physical parameter values, along 
+        with attached custom attributes:
+        - `param_names` (list of str): Names of the optimized free parameters.
+        - `fixed_params` (dict): Dictionary of parameters held constant during optimization.
 
     Raises
     ------
     ValueError
-        If `Optim_params` is empty, if `Bounds` references a parameter not
-        present in `Optim_params`, if no parameter ends up free (i.e. none
-        of the `Optim_params` keys have a matching entry in `Bounds`), or
-        if any bound is invalid (`max <= min`).
+        - If `Optim_params` is empty or not a dictionary.
+        - If `Bounds` contains keys not present in `Optim_params`.
+        - If no free parameters are specified.
+        - If lower bound is greater than or equal to upper bound for any parameter.
     TypeError
         If `solver` is not callable.
 
-    Examples
+        Examples
     --------
     >>> vtu_files = get_vtu_files_from_pvd(PVD_FILE)
     >>> domain = load_domain_from_vtu(vtu_files[0])
@@ -365,6 +415,8 @@ def femu_res_toolbox(
     # stay fixed at their Optim_params value; only "E" and "sigma_Y" are
     # identified by the optimizer.
     """
+
+    
     if not isinstance(Optim_params, dict) or not Optim_params:
         raise ValueError("`Optim_params` must be a non-empty dict of {param_name: initial_or_fixed_value}.")
 
@@ -395,7 +447,7 @@ def femu_res_toolbox(
             raise ValueError(f"Invalid bounds for parameter '{name}': ({lo}, {hi}).")
 
     if not callable(solver):
-        raise TypeError("`solver` must be a callable with signature solver(domain, V, W, WT, run_cfg).")
+        raise TypeError("`solver` must be a callable with signature solver(run_cfg).")
 
     fixed_params = {k: Optim_params[k] for k in fixed_param_names}
     params0 = [Optim_params[k] for k in free_param_names]
@@ -404,21 +456,7 @@ def femu_res_toolbox(
     # --- 1. Load reference VTU files described by the PVD ---
     vtu_files = get_vtu_files_from_pvd(PVD_file)
 
-    print("Pre-loading reference VTU files into memory...")
-    ref_multiblock = pv.MultiBlock()
-    for f_vtu in vtu_files:
-        ref_multiblock.append(pv.read(f_vtu))
 
-    f_ref = np.load(FORCE_file)
-
-    cfg = {
-        "pvd_file_path": PVD_file,
-        "num_steps": len(vtu_files) - 1,
-        "T": 3.0,
-        "weight_u": 1.0,
-        "weight_f": 1.0,
-        **(config or {}),
-    }
 
     # --- Interactive dashboard setup (error, force fitting, per-param traces) ---
     n_free = len(free_param_names)
@@ -440,11 +478,6 @@ def femu_res_toolbox(
         ax_params.append(fig.add_subplot(gs[row, col]))
 
     history_err = []
-    vtu_files = get_vtu_files_from_pvd(PVD_file)
-
-    # --- 2. Load DOLFINx domain + function spaces ---
-    domain = load_domain_from_vtu(vtu_files[0])
-    V, W, WT = build_function_spaces(domain)
 
     # --- 3. Pre-load experimental DIC reference fields into memory ---
     print("Pré-chargement des fichiers VTU de référence en mémoire...")
@@ -467,7 +500,16 @@ def femu_res_toolbox(
         **(config or {}),
     }
     history_params = []
-
+    dummy_res = compute_u_f_residuals_is_imported(
+            ref_multiblock,
+            ref_multiblock,
+            f_ref,
+            f_ref,
+            vtu_function_name="displacement_projected",
+            sim_function_name="displacement_projected",
+            weight_u=1.0,
+            weight_f=5.0,
+        )
     # --- Normalisation ---
     params0_norm = normalize_params(params0, bounds_free)
     bounds_norm = ScipyBounds([0.0] * len(params0), [1.0] * len(params0))
@@ -534,7 +576,7 @@ def femu_res_toolbox(
         params0_norm,
         method='trf',
         bounds=bounds_norm,
-        ftol=1e-7, gtol=1e-8, max_nfev=500, verbose=2, x_scale=1.0, diff_step=5e-3, xtol=None,
+        ftol=ftol, gtol=gtol, max_nfev=max_nfev, verbose=2, x_scale=1.0, diff_step=diff_step, xtol=xtol,
     )
 
     plt.ioff()
@@ -554,7 +596,6 @@ def femu_res_toolbox(
 
 
 
-
 # ---------------------------------------------------------------------------
 # 5. Manual test entry point
 # ---------------------------------------------------------------------------
@@ -565,13 +606,11 @@ if __name__ == "__main__":
     # for Hill48Model (or any other model): just write a different solver.
     # ------------------------------------------------------------------
     from simu_tools import ElasticModel, J2IsotropicHardening
-    from hill48_model import Hill48Model
-    from plasticity_simu import run_simulation_bc_vtu_fast
-    from elastoplastic_test import fenicsx_elastoplastic_solver
+    from plasticity_solver_import_bc.plasticity_simu import run_simulation_bc_vtu_fast
 
 
-    PVD_FILE   = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd"
-    FORCE_FILE = "MAINTEST/pyvista_exports/csv_projection_A305_FULL/forces_sample_A305.npy"
+    PVD_FILE   = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected_A305.pvd"
+    FORCE_FILE = "MAINTEST/pyvista_exports/csv_projection/forces_sample_A305.npy"
 
     vtu_files = get_vtu_files_from_pvd(PVD_FILE)
     domain = load_domain_from_vtu(vtu_files[0])
@@ -594,30 +633,6 @@ if __name__ == "__main__":
         f_sim, sim_multiblock = run_simulation_bc_vtu_fast(domain, V, W, WT, run_cfg, model=model)
 
         return 10*np.array(f_sim), sim_multiblock
- 
-    def my_solver2(domain, V, W, WT, run_cfg):
-        """
-        Build a J2 isotropic-hardening model from the current parameter
-        set in `run_cfg` and run the FE simulation.
- 
-        Must return (f_sim, sim_multiblock), exactly what
-        `run_simulation_bc_vtu_fast` already returns.
-        """
-        model = Hill48Model(
-            elastic=ElasticModel(run_cfg["E"], run_cfg["nu"], tdim=domain.topology.dim),
-            sigma_Y=run_cfg["sigma_Y"],
-            Q_var=run_cfg["Q_var"],
-            k_hardening=run_cfg["k_hardening"],
-            F=run_cfg["F"],
-            G=run_cfg["G"],
-            H=1-run_cfg["G"],
-            L=1.5,
-            M=1.5,
-            N=run_cfg["N"],
-        )
-        return run_simulation_bc_vtu_fast(domain, V, W, WT, run_cfg, model=model)
-
-    # --- Inputs: adjust these paths to your own data ---
 
  
     # Every parameter the model needs. Values are the initial guess for
@@ -625,25 +640,25 @@ if __name__ == "__main__":
     Optim_params = {
         "E": 210_000.0,          # will be identified (has bounds below)
         "nu": 0.30,               # fixed: no entry in Bounds
-        "sigma_Y": 200.0,         # will be identified
+        "sigma_Y": 144.0,         # will be identified
         "Q_var": 50.0,            # fixed
-        "k_hardening": 500.0,   # fixed
+        "k_hardening": 1500.0,   # fixed
     }
  
     # Only parameters listed here are optimized. Anything in Optim_params
     # that is NOT listed here is treated as fixed automatically.
     Bounds = {
-        "Q_var": (10.0, 1000.0),
+        "Q_var": (50, 1000.0),
         "sigma_Y": (10.0, 1000.0),
         "k_hardening": (10.0, 1_500.0),
-        "E": (100_000.0, 300_000.0),
     }
  
     config = {
-        "num_steps": 54,
+        "pvd_file_path" : PVD_FILE,
+        "num_steps": 53, #len(vtu)-1
         "T": 3.0,
-        "weight_u": 1.0,
-        "weight_f": 3.0,
+        "weight_u": 0.0,
+        "weight_f": 5.0,
     }
  
     result = femu_res_toolbox(
@@ -665,3 +680,4 @@ if __name__ == "__main__":
             print(f"  {name:>15s} = {val}")
     print(f"  cout final (sum r^2) = {float(np.sum(result.fun ** 2)):.6e}")
     print("=" * 60)
+

@@ -1,22 +1,21 @@
 # A VIC-2D/3D Digital Image Correlation & Finite Element Model Updating Framework
 
-A Python framework dedicated to VIC-2D/3D Digital Image Correlation (DIC) data exploitation for mechanical parameter identification. The pipeline leverages Finite Element Model Updating (FEMU), using FEniCSx for PDE solving.
+This framework bridges experimental full-field measurements and numerical simulations to solve inverse problems in solid mechanics. It processes displacement from VIC-2D/3D and forces values and uses an optimization loop to identify material properties.
 
-> 🚧 **Work In Progress (WIP):** Active development is currently focused exclusively on the `plasticity/` directory.
-
----
+The current PDE solver backend relies on **FEniCSx**, but the core pipeline is built with a modular abstraction layer to support any Finite Element (FE) solver that can be implemented via python.
 
 ## Prerequisites & Installation
 
-> **Platform Note:** This installation setup is explicitly tailored and tested for a Linux environment.
+> **Platform Note:** This installation setup is explicitly tailored for a Linux environment.
 
-Due to complex scientific dependencies, it is highly recommended to use Conda (or Mamba if Conda is crashing) to manage your virtual environment.
+Use Conda (or Mamba if Conda is crashing) to manage your virtual environment.
 
-### 1. Create the Environment
-Using the `environement.yml` file, execute the following command to create a dedicated environment named `femu_env` containing all required packages :
+### Environment setup
+Using the `environement.yml` file, execute the following command to create a dedicated conda environment named `femu_env` containing all required packages :
 
 ```bash
 conda env create -f environnement.yml
 ```
+
 
 
