@@ -1,6 +1,8 @@
 """
 FEMU parameter identification toolbox for DIC-based mechanical characterization.
 
+author : Marechal Paulin (marechal.paulin@gmail.com)
+
 This module provides a generic Finite Element Model Updating (FEMU) pipeline
 for identifying constitutive model parameters (e.g. elastic and plastic
 hardening properties) by minimizing the mismatch between experimental

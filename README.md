@@ -16,6 +16,3 @@ Using the `environement.yml` file, execute the following command to create a ded
 ```bash
 conda env create -f environnement.yml
 ```
-
-
-

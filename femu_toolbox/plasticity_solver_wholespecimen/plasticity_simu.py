@@ -1,6 +1,8 @@
 """
 plasticity_simu.py
 ------------------
+author : Marechal Paulin (marechal.paulin@gmail.com)
+
 FEM simulation runner that applies Dirichlet boundary conditions derived
 from DIC data (imported as a PVD/VTU series), and produces a PyVista
 MultiBlock of displacement fields alongside a reaction-force vector.
@@ -28,7 +30,7 @@ from dolfinx import fem, log
 from mpi4py import MPI
 from petsc4py import PETSc
 
-from ..simu_tools import (
+from simu_tools import (
     ElasticModel,
     J2IsotropicHardening,
     PlasticityModel,

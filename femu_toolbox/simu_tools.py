@@ -1,6 +1,8 @@
 """
 simu_tools.py
 -------------
+author : Marechal Paulin (marechal.paulin@gmail.com)
+
 Core constitutive models and FEM solver construction for elasto-plastic
 simulations using FEniCSx / dolfinx.
 

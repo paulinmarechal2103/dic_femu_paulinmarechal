@@ -2,6 +2,8 @@
 run_calibration.py
 ==================
 
+author : Marechal Paulin (marechal.paulin@gmail.com)
+
 Execution script for 2-D Digital Image Correlation (DIC) camera calibration.
 
 Purpose
@@ -48,11 +50,11 @@ import skimage.io
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 
-MESH_MSH = os.path.join(PROJECT_ROOT, "plasticity/A305_COARSE.msh")
+MESH_MSH = os.path.join("msh/A305_COARSE.msh")
 REF_IMAGE = os.path.join(
-    "/home/pmarechal/Documents/ESCAL/transfer_12868454_files_9cfdfa8b/face_avant/test000000.tif"
+    "MAINTEST/CSV/test000009.tif"
 )
-OUTPUT_NPY = os.path.join(SCRIPT_DIR, "calibration_matrix.npy")
+OUTPUT_NPY = os.path.join("MAINTEST/CSV/calibration_matrix.npy")
 
 # ---------------------------------------------------------------------------
 # Package imports

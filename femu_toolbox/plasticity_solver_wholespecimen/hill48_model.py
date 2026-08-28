@@ -1,6 +1,8 @@
 """
 hill48_model.py
 ---------------
+author : Marechal Paulin (marechal.paulin@gmail.com)
+
 Hill48 orthotropic anisotropic plasticity model with Voce isotropic hardening.
 
 Formulation

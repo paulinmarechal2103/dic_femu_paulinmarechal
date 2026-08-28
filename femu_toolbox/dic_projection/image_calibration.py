@@ -2,6 +2,8 @@
 image_calibration.py
 =====================
 
+author : Marechal Paulin (marechal.paulin@gmail.com)
+
 2-D Digital Image Correlation (DIC) camera calibration utilities.
 
 Purpose

@@ -1,6 +1,8 @@
 """
 hill48_model.py
 ---------------
+author : Marechal Paulin (marechal.paulin@gmail.com)
+
 Hill48 orthotropic anisotropic plasticity model with Voce isotropic hardening.
 
 Formulation
@@ -19,7 +21,7 @@ Plastic Flow Rule:
 import ufl
 from dolfinx import fem
 
-from .simu_tools import ElasticModel, PlasticState, PlasticityModel
+from simu_tools import ElasticModel, PlasticState, PlasticityModel
 
 
 class Hill48state(PlasticState):

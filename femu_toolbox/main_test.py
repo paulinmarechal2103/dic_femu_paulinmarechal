@@ -1,6 +1,8 @@
 """
-main_test_isotropic.py
+main_test.py
 ======================
+
+author : Marechal Paulin (marechal.paulin@gmail.com)
 
 Main execution script for FEMU parameter identification.
 
@@ -57,8 +59,8 @@ from simu_tools import (
 # Pipeline Execution Flags
 # ---------------------------------------------------------------------------
 force_export = 0  # Set to 1 to extract and export experimental forces from TXT, 0 to skip
-project_csv = 0   # Set to 1 to run DIC CSV projection onto CAD, 0 to skip
-femu = 1          # Set to 1 to run FEMU parameter identification, 0 to skip
+project_csv = 1   # Set to 1 to run DIC CSV projection onto CAD, 0 to skip
+femu = 0   # Set to 1 to run FEMU parameter identification, 0 to skip
 
 
 # ---------------------------------------------------------------------------
@@ -67,12 +69,12 @@ femu = 1          # Set to 1 to run FEMU parameter identification, 0 to skip
 
 
 def exporter_force_npy(
-    fichier_txt: str,
-    img_debut: int,
-    img_fin: int,
-    ech: int,
-    fichier_sortie: str = "matrice_force.npy",
-) -> np.ndarray:
+		fichier_txt: str,
+		img_debut: int,
+		img_fin: int,
+		ech: int,
+		fichier_sortie: str = "matrice_force.npy",
+	) -> np.ndarray:
     """
     Extract axial force values from raw acquisition text files and export to NumPy array.
 
@@ -166,7 +168,7 @@ if force_export == 1:
 
 #YOU MUST GENERATE THIS NPY FILE WITH THE test_calibration.py FILE OR AN ANALOGOUS PROGRAM
 
-T = np.load("calibration_matrix_A305.npy")
+T = np.load("MAINTEST/CSV/calibration_matrix_A305.npy")
 
 
 # ---------------------------------------------------------------------------
@@ -175,13 +177,13 @@ T = np.load("calibration_matrix_A305.npy")
 if project_csv == 1:
     print("[Stage 1] Launching DIC CSV displacement projection onto CAD mesh...")
     process_csv_series_to_cad_mesh(
-        folder_path="/home/pmarechal/Documents/A305/A305_rectangle",
+        folder_path="MAINTEST/CSV/A305_rectangle_1/",
         file_prefix="test00",
-        mesh_cad_path="/home/pmarechal/Documents/projet_dic/plasticity/A305_COARSE.msh",
+        mesh_cad_path="msh/A305_COARSE.msh",
         tform_img_to_cad_4D=np.linalg.inv(T),  # Inverse calibration matrix (image -> CAD)
-        output_pvd_path="MAINTEST/pyvista_exports/csv_projection/dic_series_projected.pvd",
+        output_pvd_path="MAINTEST/pyvista_exports/csv_projection_A305_rectangle/dic_series_projected_A305.pvd",
         alpha=20.0,
-        ech=108,
+        ech=1,
         start_idx=9,
         end_idx=5791,
     )
@@ -190,9 +192,10 @@ if project_csv == 1:
 # ---------------------------------------------------------------------------
 # 4. Stage 2 – FEMU Parameter Identification (J2 Isotropic Material)
 # ---------------------------------------------------------------------------
+
 if femu == 1:
-    PVD_FILE = "MAINTEST/pyvista_exports/csv_projection/dic_series_projected_A305.pvd"
-    FORCE_FILE = "MAINTEST/pyvista_exports/csv_projection/forces_sample_A305.npy"
+    PVD_FILE = "MAINTEST/pyvista_exports/csv_projection_A305_rectangle/dic_series_projected_A305.pvd"
+    FORCE_FILE = "MAINTEST/pyvista_exports/csv_projection_A305_rectangle/forces_sample_A305.npy"
 
     vtu_files = get_vtu_files_from_pvd(PVD_FILE)
     domain = load_domain_from_vtu(vtu_files[0])

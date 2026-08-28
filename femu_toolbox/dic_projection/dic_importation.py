@@ -2,6 +2,8 @@
 dic_importation.py
 ===================
 
+author : Marechal Paulin (marechal.paulin@gmail.com)
+
 2-D Digital Image Correlation (DIC) data importation and projection utilities.
 
 Purpose
