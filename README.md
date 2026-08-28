@@ -4,6 +4,8 @@ This framework bridges experimental full-field measurements and numerical simula
 
 The current PDE solver backend relies on **FEniCSx**, but the core pipeline is built with a modular abstraction layer to support any Finite Element (FE) solver that can be implemented via python.
 
+You will find everything you need in the [Wiki](https://github.com/paulinmarechal2103/dic_femu_paulinmarechal/wiki) !
+
 ## Prerequisites & Installation
 
 > **Platform Note:** This installation setup is explicitly tailored for a Linux environment.
